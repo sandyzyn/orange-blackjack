@@ -5,12 +5,39 @@ function Navbar({ setAddress }) {
   const signOut = () => setAddress(null);
 
   return (
-    <nav className="flex justify-between items-center p-4 bg-orange-300">
-      <div>
-        <Link to="/" className="mr-4 font-bold">🎴 Orange and Blackjack</Link>
-        <Link to="/about" className="mr-4">How to Play</Link>
+    <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 32px", backgroundColor: "white", borderBottom: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      {/* Left: Logo */}
+      <Link to="/" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+        <img
+          src="/logo.png"
+          alt="Logo"
+          style={{ height: "60px", width: "auto", objectFit: "contain" }}
+        />
+      </Link>
+
+      {/* Right: Separated Link and Button */}
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ marginRight: "24px" }}>
+          <Link
+            to="/about"
+            style={{ fontSize: "14px", fontWeight: "500", color: "#374151", textDecoration: "none" }}
+            onMouseOver={(e) => (e.target.style.color = "#f97316")}
+            onMouseOut={(e) => (e.target.style.color = "#374151")}
+          >
+            How to Play
+          </Link>
+        </div>
+        <div>
+          <button
+            onClick={signOut}
+            style={{ fontSize: "14px", backgroundColor: "#f97316", color: "white", padding: "8px 16px", borderRadius: "6px", border: "none", cursor: "pointer" }}
+            onMouseOver={(e) => (e.target.style.backgroundColor = "#ea580c")}
+            onMouseOut={(e) => (e.target.style.backgroundColor = "#f97316")}
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
-      <button onClick={signOut} className="bg-white px-3 py-1 rounded">Sign Out</button>
     </nav>
   );
 }
