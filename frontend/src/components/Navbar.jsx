@@ -2,7 +2,11 @@ import React from "react";
 import { Link } from "react-router-dom";
 
 function Navbar({ setAddress }) {
-  const signOut = () => setAddress(null);
+  const signOut = () => {
+    localStorage.removeItem("walletAddress");
+    localStorage.removeItem("playerName");
+    setAddress(null); // Force reconnection on next visit
+  };
 
   return (
     <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 32px", backgroundColor: "white", borderBottom: "1px solid #e5e7eb", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
