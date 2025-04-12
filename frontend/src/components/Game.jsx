@@ -5,6 +5,19 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../contract/OrangeBlackJack";
 const LUSD_ADDRESS = "0x9142FA65aAEf921Aea2127e88758adeE0510a0F0";
 const GAME_STATES = ["NotStarted", "PlayerTurn", "DealerTurn", "Finished"];
 
+const CARD_STYLE = {
+  width: "60px",
+  height: "90px",
+  backgroundColor: "white",
+  border: "1px solid black",
+  borderRadius: "8px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "1.2rem",
+  fontWeight: "bold",
+};
+
 const Game = () => {
   const [status, setStatus] = useState("🦊 Connect your wallet to begin.");
   const [betAmount, setBetAmount] = useState("");
@@ -17,8 +30,12 @@ const Game = () => {
   const [lusdBalance, setLusdBalance] = useState("0");
   const [isApproved, setIsApproved] = useState(false);
   const [hasGame, setHasGame] = useState(false);
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
+    const storedName = localStorage.getItem("playerName");
+    if (storedName) setUsername(storedName);
+
     const init = async () => {
       if (!window.ethereum) return setStatus("❌ Please install MetaMask.");
 
@@ -34,7 +51,7 @@ const Game = () => {
         const LUSD_ABI = [
           "function approve(address spender, uint256 amount) external returns (bool)",
           "function allowance(address owner, address spender) view returns (uint256)",
-          "function balanceOf(address account) view returns (uint256)"
+          "function balanceOf(address account) view returns (uint256)",
         ];
         const lusd = new ethers.Contract(LUSD_ADDRESS, LUSD_ABI, signer);
         setLUSD(lusd);
@@ -125,7 +142,7 @@ const Game = () => {
       setStatus("🎲 Game started!");
     } catch (err) {
       console.error(err);
-      setStatus("❌ Bet failed: " + err.message);
+      setStatus("❌ Bet failed: Please enter a valid number");
     }
   };
 
@@ -181,7 +198,7 @@ const Game = () => {
 
       const log = receipt.logs.find(
         log => log.topics[0] === gameEndedTopic &&
-              log.address.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
+                log.address.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
       );
 
       if (log) {
@@ -205,22 +222,19 @@ const Game = () => {
       await fetchHands();
       await fetchGameState();
       await checkIfPlayerHasGame(contract);
-
     } catch (err) {
       console.error("❌ Stand failed: ", err);
       setStatus("❌ Stand failed — possibly not your game or already ended.");
     }
   };
 
-
   return (
-    <div style={{ maxWidth: "800px", margin: "2rem auto", padding: "2rem", fontFamily: "Georgia, serif" }}>
-      <h1 style={{ color: "#f57c00", fontSize: "2.5rem", textAlign: "center" }}>
-        Orange & Blackjack
+    <div style={{ maxWidth: "600px", margin: "2rem auto", padding: "2rem", fontFamily: "Georgia, serif", textAlign: "center" }}>
+      <h1 style={{ color: "#f57c00", fontSize: "2.5rem" }}>
+       Welcome {username || "playerName"}
       </h1>
 
       <p><strong>Status:</strong> {status}</p>
-      <p><strong>Wallet:</strong> {walletAddress}</p>
       <p><strong>LUSD Balance:</strong> {lusdBalance}</p>
       <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
@@ -245,25 +259,25 @@ const Game = () => {
       </div>
 
       <h2>🧑 Your Hand</h2>
-      <div style={{ display: "flex", gap: "10px", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "1rem" }}>
         {playerHand.length > 0
           ? playerHand.map((card, i) => (
-              <div key={i} style={{ border: "1px solid black", padding: "10px", fontSize: "1.2rem" }}>{card}</div>
+              <div key={i} style={CARD_STYLE}>{card}</div>
             ))
           : <p>No cards yet</p>}
       </div>
 
       <h2>🃏 Dealer's Visible Card</h2>
-      {dealerCard !== null ? (
-        <div style={{ border: "1px solid black", padding: "10px", width: "40px", textAlign: "center", fontSize: "1.2rem" }}>
-          {dealerCard}
-        </div>
-      ) : (
-        <p>No card revealed yet</p>
-      )}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5rem" }}>
+        {dealerCard !== null ? (
+          <div style={CARD_STYLE}>{dealerCard}</div>
+        ) : (
+          <p>No card revealed yet</p>
+        )}
+      </div>
 
-      <div style={{ marginTop: "1.5rem" }}>
-        <button onClick={hit} disabled={gameState !== 1 || !hasGame} style={{ marginRight: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
+        <button onClick={hit} disabled={gameState !== 1 || !hasGame}>
           Hit
         </button>
         <button onClick={stand} disabled={gameState !== 1 || !hasGame}>
