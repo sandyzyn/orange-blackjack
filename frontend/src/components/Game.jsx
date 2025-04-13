@@ -21,6 +21,16 @@ const CARD_STYLE = {
   textAlign: "center"
 };
 
+const formatLargeNumber = (num) => {
+  if (num >= 1e9) {
+    return (num / 1e9).toFixed(2) + " billion";
+  } else if (num >= 1e6) {
+    return (num / 1e6).toFixed(2) + " million";
+  } else {
+    return Number(num).toFixed(2);
+  }
+};
+
 const Toast = ({ message, color }) => (
   <div style={{
     position: 'fixed',
@@ -374,7 +384,7 @@ const Game = () => {
       // Check if player got blackjack
       const updatedGameData = await gameContract.getGameState(walletAddress);
       if (updatedGameData.result === "Blackjack") {
-        const payout = Number(ethers.formatUnits(updatedGameData.payout, 18)).toFixed(2);
+        const payout = formatLargeNumber(Number(ethers.formatUnits(updatedGameData.payout, 18)));
         showToast(`🎰 BLACKJACK! You won ${payout} LUSD`, "green");
         setStatus(`🎰 BLACKJACK! You won ${payout} LUSD`);
       } else {
@@ -456,7 +466,7 @@ const Game = () => {
       const updatedGameData = await gameContract.getGameState(walletAddress);
       
       if (updatedGameData.result === "Win") {
-        const gain = Number(ethers.formatUnits(updatedGameData.payout, 18)).toFixed(2);
+        const gain = formatLargeNumber(Number(ethers.formatUnits(updatedGameData.payout, 18)));
         setStatus(`🎉 You won! (+${gain} LUSD)`);
         showToast(`🎉 You won! +${gain} LUSD`, "green");
       } else if (updatedGameData.result === "Loss") {
@@ -530,7 +540,7 @@ const Game = () => {
       const amount = ethers.parseUnits(withdrawAmount, 18);
       const tx = await gameContract.withdraw(amount);
       await tx.wait();
-      showToast(`✅ Withdrew ${Number(withdrawAmount).toFixed(2)} LUSD`, "green");
+      showToast(`✅ Withdrew ${formatLargeNumber(Number(withdrawAmount))} LUSD`, "green");
       setWithdrawAmount("");
     } catch (err) {
       console.error(err);
@@ -607,7 +617,7 @@ const Game = () => {
         )}
 
         <p><strong>Status:</strong> {status}</p>
-        <p><strong>LUSD Balance:</strong> {Number(lusdBalance).toFixed(2)}</p>
+        <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
         <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
         {/* Stats Panel */}
@@ -620,108 +630,256 @@ const Game = () => {
             <div><strong>Ties:</strong> {playerStats.ties}</div>
             <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
             <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
-            <div><strong>Total Bets:</strong> {Number(playerStats.totalBets).toFixed(2)} LUSD</div>
+            <div><strong>Total Bets:</strong> {formatLargeNumber(Number(playerStats.totalBets))} LUSD</div>
             <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
-              <strong>Net Profit:</strong> {Number(netProfit).toFixed(2)} LUSD
+              <strong>Net Profit:</strong> {formatLargeNumber(Number(netProfit))} LUSD
             </div>
           </div>
         </div>
 
         {isOwner && (
-          <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
-            <h3>🔧 Admin Controls</h3>
+  <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
+    <h3>🔧 Admin Controls</h3>
+    <button 
+      onClick={() => setShowAdminPanel(!showAdminPanel)}
+      style={{ padding: "0.5rem 1rem", marginBottom: "1rem", fontWeight: "bold" }}
+    >
+      {showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
+    </button>
+    
+    {showAdminPanel && (
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center", width: "100%" }}>
+        {/* Contract Information */}
+        <div style={{ width: "100%", padding: "1rem", backgroundColor: "#fff8dc", borderRadius: "8px" }}>
+          <h4 style={{ marginBottom: "0.5rem" }}>Contract Information</h4>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
             <button 
-              onClick={() => setShowAdminPanel(!showAdminPanel)}
-              style={{ padding: "0.5rem 1rem", marginBottom: "1rem", fontWeight: "bold" }}
+              onClick={async () => {
+                try {
+                  const balance = await LUSD.balanceOf(GAME_CONTRACT_ADDRESS);
+                  const formattedBalance = formatLargeNumber(Number(ethers.formatUnits(balance, 18)));
+                  showToast(`Contract balance: ${formattedBalance} LUSD`, "blue");
+                } catch (err) {
+                  console.error(err);
+                  showToast("Failed to get contract balance", "red");
+                }
+              }}
+              style={{ marginRight: "1rem" }}
             >
-              {showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
+              Check Contract Balance
             </button>
-            
-            {showAdminPanel && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
-                <div>
-                  <h4>Edit Player's Hand</h4>
-                  <input
-                    type="text"
-                    placeholder="Player address"
-                    value={editPlayerAddress}
-                    onChange={(e) => setEditPlayerAddress(e.target.value)}
-                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                    />
-                  <input
-                    type="text"
-                    placeholder="Cards (e.g. 1,10,5)"
-                    value={editPlayerInput}
-                    onChange={(e) => setEditPlayerInput(e.target.value)}
-                    style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                  <button onClick={editPlayerHand}>Edit Player Hand</button>
-                </div>
-                
-                <div>
-                  <h4>Edit Dealer's Hand</h4>
-                  <input
-                    type="text"
-                    placeholder="Player address (same as above)"
-                    value={editPlayerAddress}
-                    onChange={(e) => setEditPlayerAddress(e.target.value)}
-                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Cards (e.g. 1,10,5)"
-                    value={editDealerInput}
-                    onChange={(e) => setEditDealerInput(e.target.value)}
-                    style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                  <button onClick={editDealerHand}>Edit Dealer Hand</button>
-                </div>
-                
-                <div>
-                  <h4>Withdraw Funds</h4>
-                  <input
-                    type="number"
-                    placeholder="Amount to withdraw"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                    style={{ width: "200px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                  <button onClick={withdrawFunds} style={{ marginRight: "0.5rem" }}>Withdraw Amount</button>
-                  <button onClick={withdrawAllFunds}>Withdraw All</button>
-                </div>
-                
-                <div>
-                  <h4>Force End Game</h4>
-                  <input
-                    type="text"
-                    placeholder="Player address"
-                    value={editPlayerAddress}
-                    onChange={(e) => setEditPlayerAddress(e.target.value)}
-                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                  <button onClick={() => {
-                    if (editPlayerAddress) {
-                      gameContract.forceEndGame(editPlayerAddress)
-                        .then(tx => tx.wait())
-                        .then(() => showToast("Game force-ended for player", "green"))
-                        .catch(err => {
-                          console.error(err);
-                          showToast("Failed to force end game", "red");
-                        });
-                    }
-                  }}>Force End</button>
-                </div>
-              </div>
-            )}
-            
             <button 
-              onClick={resetGame} 
-              style={{ padding: "0.5rem 1rem", fontWeight: "bold", marginTop: "1rem" }}
+              onClick={async () => {
+                try {
+                  if (!statsContract) return;
+                  const allPlayers = await statsContract.getAllPlayers();
+                  showToast(`Total players: ${allPlayers.length}`, "blue");
+                } catch (err) {
+                  console.error(err);
+                  showToast("Failed to get player count", "red");
+                }
+              }}
             >
-              Reset My Game
+              Count Players
             </button>
           </div>
-        )}
+        </div>
+        
+        {/* Player Management */}
+        <div style={{ width: "100%", padding: "1rem", backgroundColor: "#f0f8ff", borderRadius: "8px" }}>
+          <h4 style={{ marginBottom: "0.5rem" }}>Player Management</h4>
+          <div>
+            <input
+              type="text"
+              placeholder="Player address"
+              value={editPlayerAddress}
+              onChange={(e) => setEditPlayerAddress(e.target.value)}
+              style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+            />
+            <button 
+              onClick={async () => {
+                if (!statsContract || !editPlayerAddress) return;
+                try {
+                  const playerStats = await statsContract.getStats(editPlayerAddress);
+                  const netProfit = await statsContract.getNetProfit(editPlayerAddress);
+                  
+                  const stats = {
+                    wins: Number(playerStats.wins),
+                    losses: Number(playerStats.losses),
+                    ties: Number(playerStats.ties),
+                    blackjacks: Number(playerStats.blackjacks),
+                    earnings: Number(ethers.formatUnits(playerStats.earnings, 18)).toFixed(2),
+                    bets: Number(ethers.formatUnits(playerStats.bets, 18)).toFixed(2),
+                    biggestWin: Number(ethers.formatUnits(playerStats.biggestWin, 18)).toFixed(2),
+                    currentStreak: Number(playerStats.streak),
+                    longestStreak: Number(playerStats.longestStreak),
+                    gamesPlayed: Number(playerStats.gamesPlayed),
+                    netProfit: Number(ethers.formatUnits(netProfit, 18)).toFixed(2),
+                    name: playerStats.name
+                  };
+                  
+                  // Display stats in a more readable format
+                  const statsText = Object.entries(stats)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join('\n');
+                  
+                  console.log(`Player stats for ${editPlayerAddress}:`, stats);
+                  showToast(`Retrieved player stats. Check console.`, "green");
+                } catch (err) {
+                  console.error(err);
+                  showToast("Failed to get player stats", "red");
+                }
+              }}
+              style={{ marginRight: "0.5rem" }}
+            >
+              View Stats
+            </button>
+            
+            <button
+              onClick={async () => {
+                if (!statsContract || !editPlayerAddress) return;
+                try {
+                  await statsContract.updateLeaderboard(editPlayerAddress);
+                  showToast("Leaderboard updated", "green");
+                  await fetchLeaderboard();
+                } catch (err) {
+                  console.error(err);
+                  showToast("Failed to update leaderboard", "red");
+                }
+              }}
+            >
+              Update Leaderboard
+            </button>
+          </div>
+        </div>
+        
+        {/* Edit Hands */}
+        <div>
+          <h4>Edit Player's Hand</h4>
+          <input
+            type="text"
+            placeholder="Player address"
+            value={editPlayerAddress}
+            onChange={(e) => setEditPlayerAddress(e.target.value)}
+            style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+            />
+          <input
+            type="text"
+            placeholder="Cards (e.g. 1,10,5)"
+            value={editPlayerInput}
+            onChange={(e) => setEditPlayerInput(e.target.value)}
+            style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
+          />
+          <button onClick={editPlayerHand}>Edit Player Hand</button>
+        </div>
+        
+        <div>
+          <h4>Edit Dealer's Hand</h4>
+          <input
+            type="text"
+            placeholder="Player address (same as above)"
+            value={editPlayerAddress}
+            onChange={(e) => setEditPlayerAddress(e.target.value)}
+            style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+          />
+          <input
+            type="text"
+            placeholder="Cards (e.g. 1,10,5)"
+            value={editDealerInput}
+            onChange={(e) => setEditDealerInput(e.target.value)}
+            style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
+          />
+          <button onClick={editDealerHand}>Edit Dealer Hand</button>
+        </div>
+        
+        <div>
+          <h4>Withdraw Funds</h4>
+          <input
+            type="number"
+            placeholder="Amount to withdraw"
+            value={withdrawAmount}
+            onChange={(e) => setWithdrawAmount(e.target.value)}
+            style={{ width: "200px", padding: "0.5rem", marginRight: "0.5rem" }}
+          />
+          <button onClick={withdrawFunds} style={{ marginRight: "0.5rem" }}>Withdraw Amount</button>
+          <button onClick={withdrawAllFunds}>Withdraw All</button>
+        </div>
+        
+        <div>
+          <h4>Force End Game</h4>
+          <input
+            type="text"
+            placeholder="Player address"
+            value={editPlayerAddress}
+            onChange={(e) => setEditPlayerAddress(e.target.value)}
+            style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+          />
+          <button onClick={() => {
+            if (editPlayerAddress) {
+              gameContract.forceEndGame(editPlayerAddress)
+                .then(tx => tx.wait())
+                .then(() => showToast("Game force-ended for player", "green"))
+                .catch(err => {
+                  console.error(err);
+                  showToast("Failed to force end game", "red");
+                });
+            }
+          }}>Force End</button>
+        </div>
+        
+        {/* Leaderboard View */}
+        <div style={{ width: "100%", padding: "1rem", backgroundColor: "#f0fff0", borderRadius: "8px" }}>
+          <h4 style={{ marginBottom: "0.5rem" }}>Leaderboard</h4>
+          <button onClick={() => fetchLeaderboard()} style={{ marginBottom: "1rem" }}>Refresh Leaderboard</button>
+          
+          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ backgroundColor: "#e9e9e9" }}>
+                  <th style={{ padding: "0.5rem", textAlign: "left", borderBottom: "1px solid #ddd" }}>Rank</th>
+                  <th style={{ padding: "0.5rem", textAlign: "left", borderBottom: "1px solid #ddd" }}>Player</th>
+                  <th style={{ padding: "0.5rem", textAlign: "left", borderBottom: "1px solid #ddd" }}>Name</th>
+                  <th style={{ padding: "0.5rem", textAlign: "right", borderBottom: "1px solid #ddd" }}>Net Profit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboardEntries.map((entry, index) => (
+                  <tr key={index}>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>{index + 1}</td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>
+                      {`${entry.address.substring(0, 6)}...${entry.address.substring(38)}`}
+                    </td>
+                    <td style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>{entry.name || "Anonymous"}</td>
+                    <td style={{ 
+                    padding: "0.5rem", 
+                    borderBottom: "1px solid #ddd", 
+                    textAlign: "right",
+                    color: entry.netProfit >= 0 ? "green" : "red"
+                  }}>
+                    {formatLargeNumber(Number(entry.netProfit))} LUSD
+                  </td>
+                  </tr>
+                ))}
+                {leaderboardEntries.length === 0 && (
+                  <tr>
+                    <td colSpan="4" style={{ padding: "1rem", textAlign: "center" }}>No players on leaderboard yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )}
+    
+    <button 
+      onClick={resetGame} 
+      style={{ padding: "0.5rem 1rem", fontWeight: "bold", marginTop: "1rem" }}
+    >
+      Reset My Game
+    </button>
+  </div>
+)}
 
         <div style={{ marginBottom: "2rem" }}>
           {!hasGame && (
@@ -813,10 +971,10 @@ const Game = () => {
               }}>
                 <div>Result: {gameOutcome.result}</div>
                 {gameOutcome.payout > 0 && (
-                  <div style={{ color: "green", marginTop: "0.5rem" }}>
-                    Payout: {Number(gameOutcome.payout).toFixed(2)} LUSD
-                  </div>
-                )}
+                <div style={{ color: "green", marginTop: "0.5rem" }}>
+                  Payout: {formatLargeNumber(Number(gameOutcome.payout))} LUSD
+                </div>
+              )}
               </div>
             )}
 
