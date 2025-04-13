@@ -278,11 +278,18 @@ const Game = () => {
       const formattedPlayerHand = formatHandData(gameData.pHand);
       const formattedDealerHand = formatHandData(gameData.dHand);
       
+      // Set player hand and total regardless of game state
       setPlayerHand(formattedPlayerHand);
-      const myTotal = calculateHandTotal(formattedPlayerHand);
-      setHandTotal(myTotal);
+      const playerTotal = calculateHandTotal(formattedPlayerHand);
+      setHandTotal(playerTotal);
 
       if (Number(gameData.state) === 3) { // Game finished
+        // For finished games, show dealer's full hand and total
+        setDealerFullHand(formattedDealerHand);
+        setDealerCard(null); // Clear the dealer's single card view
+        setDealerTotal(calculateHandTotal(formattedDealerHand));
+      } else if (Number(gameData.state) === 2) { // Dealer's turn
+        // Show all dealer cards during dealer's turn
         setDealerFullHand(formattedDealerHand);
         setDealerCard(null);
         setDealerTotal(calculateHandTotal(formattedDealerHand));
@@ -367,7 +374,7 @@ const Game = () => {
       // Check if player got blackjack
       const updatedGameData = await gameContract.getGameState(walletAddress);
       if (updatedGameData.result === "Blackjack") {
-        const payout = Number(ethers.formatUnits(updatedGameData.payout, 18));
+        const payout = Number(ethers.formatUnits(updatedGameData.payout, 18)).toFixed(2);
         showToast(`🎰 BLACKJACK! You won ${payout} LUSD`, "green");
         setStatus(`🎰 BLACKJACK! You won ${payout} LUSD`);
       } else {
@@ -449,7 +456,7 @@ const Game = () => {
       const updatedGameData = await gameContract.getGameState(walletAddress);
       
       if (updatedGameData.result === "Win") {
-        const gain = Number(ethers.formatUnits(updatedGameData.payout, 18));
+        const gain = Number(ethers.formatUnits(updatedGameData.payout, 18)).toFixed(2);
         setStatus(`🎉 You won! (+${gain} LUSD)`);
         showToast(`🎉 You won! +${gain} LUSD`, "green");
       } else if (updatedGameData.result === "Loss") {
@@ -523,7 +530,7 @@ const Game = () => {
       const amount = ethers.parseUnits(withdrawAmount, 18);
       const tx = await gameContract.withdraw(amount);
       await tx.wait();
-      showToast(`✅ Withdrew ${withdrawAmount} LUSD`, "green");
+      showToast(`✅ Withdrew ${Number(withdrawAmount).toFixed(2)} LUSD`, "green");
       setWithdrawAmount("");
     } catch (err) {
       console.error(err);
@@ -585,19 +592,22 @@ const Game = () => {
           Orange BlackJack
         </h1>
         
-        <div style={{ marginBottom: "1rem" }}>
-          <input 
-            type="text" 
-            placeholder="Enter your username" 
-            value={username} 
-            onChange={e => setUsername(e.target.value)}
-            style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
-          />
-          <button onClick={saveUsername}>Save Name</button>
-        </div>
+        {/* Only show username input if not connected to wallet */}
+        {!walletAddress && (
+          <div style={{ marginBottom: "1rem" }}>
+            <input 
+              type="text" 
+              placeholder="Enter your username" 
+              value={username} 
+              onChange={e => setUsername(e.target.value)}
+              style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
+            />
+            <button onClick={saveUsername}>Save Name</button>
+          </div>
+        )}
 
         <p><strong>Status:</strong> {status}</p>
-        <p><strong>LUSD Balance:</strong> {lusdBalance}</p>
+        <p><strong>LUSD Balance:</strong> {Number(lusdBalance).toFixed(2)}</p>
         <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
         {/* Stats Panel */}
@@ -610,9 +620,9 @@ const Game = () => {
             <div><strong>Ties:</strong> {playerStats.ties}</div>
             <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
             <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
-            <div><strong>Total Bets:</strong> {playerStats.totalBets.toFixed(2)} LUSD</div>
+            <div><strong>Total Bets:</strong> {Number(playerStats.totalBets).toFixed(2)} LUSD</div>
             <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
-              <strong>Net Profit:</strong> {netProfit.toFixed(2)} LUSD
+              <strong>Net Profit:</strong> {Number(netProfit).toFixed(2)} LUSD
             </div>
           </div>
         </div>
@@ -736,7 +746,7 @@ const Game = () => {
         </div>
 
         {/* Game Area */}
-        {hasGame && (
+        {(hasGame || gameState === 3) && (
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
             {/* Dealer's Cards */}
             <div>
@@ -752,7 +762,7 @@ const Game = () => {
                     {card}
                   </div>
                 ))}
-                {dealerFullHand.length > 0 && (
+                {dealerTotal !== null && (
                   <div style={{ 
                     marginLeft: "1rem",
                     fontWeight: "bold",
@@ -787,33 +797,64 @@ const Game = () => {
               </div>
             </div>
 
+            {/* Game Outcome Display */}
+            {gameState === 3 && gameOutcome.result && (
+              <div style={{ 
+                marginTop: "1rem", 
+                padding: "1rem", 
+                backgroundColor: 
+                  gameOutcome.result === "Win" || gameOutcome.result === "Blackjack" ? "#e6ffe6" : 
+                  gameOutcome.result === "Loss" || gameOutcome.result === "Bust" ? "#ffe6e6" : 
+                  "#f0f0f0",
+                borderRadius: "8px",
+                textAlign: "center",
+                fontWeight: "bold",
+                fontSize: "1.2rem"
+              }}>
+                <div>Result: {gameOutcome.result}</div>
+                {gameOutcome.payout > 0 && (
+                  <div style={{ color: "green", marginTop: "0.5rem" }}>
+                    Payout: {Number(gameOutcome.payout).toFixed(2)} LUSD
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Game Controls */}
-            <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
-              <button 
-                onClick={hit} 
-                disabled={gameState !== 1}
-                style={{ 
-                  padding: "0.75rem 2rem", 
-                  fontSize: "1.2rem", 
-                  fontWeight: "bold",
-                  backgroundColor: gameState === 1 ? "#4caf50" : "#e0e0e0"
-                }}
-              >
-                Hit
-              </button>
-              <button 
-                onClick={stand} 
-                disabled={gameState !== 1}
-                style={{ 
-                  padding: "0.75rem 2rem", 
-                  fontSize: "1.2rem", 
-                  fontWeight: "bold",
-                  backgroundColor: gameState === 1 ? "#f57c00" : "#e0e0e0"
-                }}
-              >
-                Stand
-              </button>
-            </div>
+            {gameState === 1 && (
+              <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
+                <button 
+                  onClick={hit} 
+                  style={{ 
+                    padding: "0.75rem 2rem", 
+                    fontSize: "1.2rem", 
+                    fontWeight: "bold",
+                    backgroundColor: "#4caf50",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Hit
+                </button>
+                <button 
+                  onClick={stand} 
+                  style={{ 
+                    padding: "0.75rem 2rem", 
+                    fontSize: "1.2rem", 
+                    fontWeight: "bold",
+                    backgroundColor: "#f57c00",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "8px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Stand
+                </button>
+              </div>
+            )}
           </div>
         )}
 
