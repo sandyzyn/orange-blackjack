@@ -19,16 +19,24 @@ function Navbar({ setAddress }) {
         />
       </Link>
 
-      {/* Right: Separated Link and Button */}
+      {/* Right: Links */}
       <div style={{ display: "flex", alignItems: "center" }}>
         <div style={{ marginRight: "24px" }}>
           <Link
             to="/about"
-            style={{ fontSize: "14px", fontWeight: "500", color: "#374151", textDecoration: "none" }}
+            style={{ fontSize: "14px", fontWeight: "500", color: "#374151", textDecoration: "none", marginRight: "20px" }}
             onMouseOver={(e) => (e.target.style.color = "#f97316")}
             onMouseOut={(e) => (e.target.style.color = "#374151")}
           >
             How to Play
+          </Link>
+          <Link
+            to="/leaderboard"
+            style={{ fontSize: "14px", fontWeight: "500", color: "#374151", textDecoration: "none" }}
+            onMouseOver={(e) => (e.target.style.color = "#f97316")}
+            onMouseOut={(e) => (e.target.style.color = "#374151")}
+          >
+            Leaderboard
           </Link>
         </div>
         <div>

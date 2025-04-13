@@ -69,11 +69,7 @@ const Game = () => {
     losses: 0,
     ties: 0,
     blackjacks: 0,
-    lifetimeEarnings: 0,
     totalBets: 0,
-    biggestWin: 0,
-    currentStreak: 0,
-    longestStreak: 0,
     gamesPlayed: 0,
     name: ""
   });
@@ -581,340 +577,268 @@ const Game = () => {
   const netProfit = playerStats.lifetimeEarnings - playerStats.totalBets;
 
   return (
-    <div style={{ maxWidth: "800px", margin: "2rem auto", padding: "2rem", fontFamily: "Georgia, serif", textAlign: "center" }}>
+    <div style={{ minHeight: "100vh", backgroundColor: "#fefefe", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px" }}>
       {toast.message && <Toast message={toast.message} color={toast.color} />}
 
-      <h1 style={{ color: "#f57c00", fontSize: "2.5rem", marginBottom: "1rem" }}>
-        🍊 Orange BlackJack
-      </h1>
-
-      <div style={{ marginBottom: "1rem" }}>
-        <input 
-          type="text" 
-          placeholder="Enter your username" 
-          value={username} 
-          onChange={e => setUsername(e.target.value)}
-          style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
-        />
-        <button onClick={saveUsername}>Save Name</button>
-      </div>
-
-      <p><strong>Status:</strong> {status}</p>
-      <p><strong>LUSD Balance:</strong> {lusdBalance}</p>
-      <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
-
-      {/* Stats Panel */}
-      <div style={{ marginBottom: "2rem", backgroundColor: "#fff3e0", padding: "1rem", borderRadius: "8px" }}>
-        <h3>📊 Your Stats</h3>
-        <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "0.5rem" }}>
-          <div><strong>Wins:</strong> {playerStats.wins}</div>
-          <div><strong>Losses:</strong> {playerStats.losses}</div>
-          <div><strong>Ties:</strong> {playerStats.ties}</div>
-          <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
-          <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
-          <div><strong>Current Streak:</strong> {playerStats.currentStreak}</div>
-          <div><strong>Longest Streak:</strong> {playerStats.longestStreak}</div>
-          <div><strong>Biggest Win:</strong> {playerStats.biggestWin.toFixed(2)} LUSD</div>
-          <div><strong>Lifetime Earnings:</strong> {playerStats.lifetimeEarnings.toFixed(2)} LUSD</div>
-          <div><strong>Total Bets:</strong> {playerStats.totalBets.toFixed(2)} LUSD</div>
-          <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
-            <strong>Net Profit:</strong> {netProfit.toFixed(2)} LUSD
-          </div>
-        </div>
-      </div>
-
-      {/* Leaderboard */}
-      <div style={{ marginBottom: "2rem", backgroundColor: "#ffecb3", padding: "1rem", borderRadius: "8px" }}>
-        <h3>🏆 Leaderboard</h3>
-        {leaderboardEntries.length > 0 ? (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Rank</th>
-                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Player</th>
-                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Net Profit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leaderboardEntries.map((entry, index) => (
-                <tr key={index} style={{ 
-                  backgroundColor: entry.address.toLowerCase() === walletAddress.toLowerCase() ? "#ffe0b2" : "transparent" 
-                }}>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
-                  </td>
-                  <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
-                    {entry.address.toLowerCase() === walletAddress.toLowerCase() 
-                      ? <strong>{username || "You"}</strong> 
-                      : entry.name || `${entry.address.substring(0, 6)}...${entry.address.substring(38)}`}
-                  </td>
-                  <td style={{ 
-                    padding: "0.5rem", 
-                    borderBottom: "1px solid #eee",
-                    color: entry.netProfit >= 0 ? "green" : "red",
-                    fontWeight: "bold"
-                  }}>
-                    {entry.netProfit.toFixed(2)} LUSD
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p>No players on the leaderboard yet. Be the first!</p>
-        )}
-      </div>
-
-      {/* Last Game Result */}
-      {gameOutcome.status === "Finished" && gameOutcome.result && (
-        <div style={{ 
-          marginBottom: "2rem", 
-          backgroundColor: gameOutcome.payout > 0 ? "#e8f5e9" : "#ffebee", 
-          padding: "1rem", 
-          borderRadius: "8px" 
-        }}>
-          <h3>🎮 Last Game Result</h3>
-          <p style={{ 
-            fontWeight: "bold", 
-            fontSize: "1.2rem",
-            color: gameOutcome.payout > 0 ? "green" : (gameOutcome.result === "Tie" ? "gray" : "red")
-          }}>
-            {gameOutcome.result === "Win" ? "You won!" : 
-             gameOutcome.result === "Loss" ? "Dealer won" :
-             gameOutcome.result === "Tie" ? "It was a tie" :
-             gameOutcome.result === "Blackjack" ? "BLACKJACK!" :
-             gameOutcome.result === "Bust" ? "You busted" :
-             gameOutcome.result}
-          </p>
-          {gameOutcome.payout > 0 && (
-            <p style={{ color: "green", fontWeight: "bold" }}>
-              Payout: +{gameOutcome.payout.toFixed(2)} LUSD
-            </p>
-          )}
-        </div>
-      )}
-
-      {isOwner && (
-        <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
-          <h3>🔧 Admin Controls</h3>
-          <button 
-            onClick={() => setShowAdminPanel(!showAdminPanel)}
-            style={{ padding: "0.5rem 1rem", marginBottom: "1rem", fontWeight: "bold" }}
-          >
-            {showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
-          </button>
-          
-          {showAdminPanel && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
-              <div>
-                <h4>Edit Player's Hand</h4>
-                <input
-                  type="text"
-                  placeholder="Player address"
-                  value={editPlayerAddress}
-                  onChange={(e) => setEditPlayerAddress(e.target.value)}
-                  style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                  />
-                <input
-                  type="text"
-                  placeholder="Cards (e.g. 1,10,5)"
-                  value={editPlayerInput}
-                  onChange={(e) => setEditPlayerInput(e.target.value)}
-                  style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
-                <button onClick={editPlayerHand}>Edit Player Hand</button>
-              </div>
-              
-              <div>
-                <h4>Edit Dealer's Hand</h4>
-                <input
-                  type="text"
-                  placeholder="Player address (same as above)"
-                  value={editPlayerAddress}
-                  onChange={(e) => setEditPlayerAddress(e.target.value)}
-                  style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
-                <input
-                  type="text"
-                  placeholder="Cards (e.g. 1,10,5)"
-                  value={editDealerInput}
-                  onChange={(e) => setEditDealerInput(e.target.value)}
-                  style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
-                <button onClick={editDealerHand}>Edit Dealer Hand</button>
-              </div>
-              
-              <div>
-                <h4>Withdraw Funds</h4>
-                <input
-                  type="number"
-                  placeholder="Amount to withdraw"
-                  value={withdrawAmount}
-                  onChange={(e) => setWithdrawAmount(e.target.value)}
-                  style={{ width: "200px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
-                <button onClick={withdrawFunds} style={{ marginRight: "0.5rem" }}>Withdraw Amount</button>
-                <button onClick={withdrawAllFunds}>Withdraw All</button>
-              </div>
-              
-              <div>
-                <h4>Force End Game</h4>
-                <input
-                  type="text"
-                  placeholder="Player address"
-                  value={editPlayerAddress}
-                  onChange={(e) => setEditPlayerAddress(e.target.value)}
-                  style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
-                <button onClick={() => {
-                  if (editPlayerAddress) {
-                    gameContract.forceEndGame(editPlayerAddress)
-                      .then(tx => tx.wait())
-                      .then(() => showToast("Game force-ended for player", "green"))
-                      .catch(err => {
-                        console.error(err);
-                        showToast("Failed to force end game", "red");
-                      });
-                  }
-                }}>Force End</button>
-              </div>
-            </div>
-          )}
-          
-          <button 
-            onClick={resetGame} 
-            style={{ padding: "0.5rem 1rem", fontWeight: "bold", marginTop: "1rem" }}
-          >
-            Reset My Game
-          </button>
-        </div>
-      )}
-
-      <div style={{ marginBottom: "2rem" }}>
-        {!hasGame && (
-          <p style={{ color: "darkred", fontWeight: "bold" }}>
-            ⚠️ You don't have an active game yet. Place a bet to start.
-          </p>
-        )}
-
+      <div style={{ maxWidth: "900px", backgroundColor: "white", padding: "32px", borderRadius: "12px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: "600", marginBottom: "20px", color: "#f97316", textAlign: "center", fontFamily: "Georgia, serif" }}>
+          Orange BlackJack
+        </h1>
+        
         <div style={{ marginBottom: "1rem" }}>
-          <input
-            type="number"
-            placeholder="Enter bet in LUSD"
-            value={betAmount}
-            onChange={(e) => setBetAmount(e.target.value)}
+          <input 
+            type="text" 
+            placeholder="Enter your username" 
+            value={username} 
+            onChange={e => setUsername(e.target.value)}
             style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
           />
-          <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
-          {!isApproved && (
-            <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
-          )}
+          <button onClick={saveUsername}>Save Name</button>
         </div>
+
+        <p><strong>Status:</strong> {status}</p>
+        <p><strong>LUSD Balance:</strong> {lusdBalance}</p>
+        <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
+
+        {/* Stats Panel */}
+        <div style={{ marginBottom: "2rem", backgroundColor: "#fff3e0", padding: "1rem", borderRadius: "8px", fontFamily: "Georgia, serif", width: "100%", maxWidth: "600px" }}>
+          <h3 style={{ textAlign: "center", marginBottom: "1rem", color: "#f97316" }}>Your Stats</h3>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+            <div><strong>Name:</strong> {playerStats.name}</div>
+            <div><strong>Wins:</strong> {playerStats.wins}</div>
+            <div><strong>Losses:</strong> {playerStats.losses}</div>
+            <div><strong>Ties:</strong> {playerStats.ties}</div>
+            <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
+            <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
+            <div><strong>Total Bets:</strong> {playerStats.totalBets.toFixed(2)} LUSD</div>
+            <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
+              <strong>Net Profit:</strong> {netProfit.toFixed(2)} LUSD
+            </div>
+          </div>
+        </div>
+
+        {isOwner && (
+          <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
+            <h3>🔧 Admin Controls</h3>
+            <button 
+              onClick={() => setShowAdminPanel(!showAdminPanel)}
+              style={{ padding: "0.5rem 1rem", marginBottom: "1rem", fontWeight: "bold" }}
+            >
+              {showAdminPanel ? "Hide Admin Panel" : "Show Admin Panel"}
+            </button>
+            
+            {showAdminPanel && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
+                <div>
+                  <h4>Edit Player's Hand</h4>
+                  <input
+                    type="text"
+                    placeholder="Player address"
+                    value={editPlayerAddress}
+                    onChange={(e) => setEditPlayerAddress(e.target.value)}
+                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+                    />
+                  <input
+                    type="text"
+                    placeholder="Cards (e.g. 1,10,5)"
+                    value={editPlayerInput}
+                    onChange={(e) => setEditPlayerInput(e.target.value)}
+                    style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
+                  />
+                  <button onClick={editPlayerHand}>Edit Player Hand</button>
+                </div>
+                
+                <div>
+                  <h4>Edit Dealer's Hand</h4>
+                  <input
+                    type="text"
+                    placeholder="Player address (same as above)"
+                    value={editPlayerAddress}
+                    onChange={(e) => setEditPlayerAddress(e.target.value)}
+                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Cards (e.g. 1,10,5)"
+                    value={editDealerInput}
+                    onChange={(e) => setEditDealerInput(e.target.value)}
+                    style={{ width: "150px", padding: "0.5rem", marginRight: "0.5rem" }}
+                  />
+                  <button onClick={editDealerHand}>Edit Dealer Hand</button>
+                </div>
+                
+                <div>
+                  <h4>Withdraw Funds</h4>
+                  <input
+                    type="number"
+                    placeholder="Amount to withdraw"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    style={{ width: "200px", padding: "0.5rem", marginRight: "0.5rem" }}
+                  />
+                  <button onClick={withdrawFunds} style={{ marginRight: "0.5rem" }}>Withdraw Amount</button>
+                  <button onClick={withdrawAllFunds}>Withdraw All</button>
+                </div>
+                
+                <div>
+                  <h4>Force End Game</h4>
+                  <input
+                    type="text"
+                    placeholder="Player address"
+                    value={editPlayerAddress}
+                    onChange={(e) => setEditPlayerAddress(e.target.value)}
+                    style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
+                  />
+                  <button onClick={() => {
+                    if (editPlayerAddress) {
+                      gameContract.forceEndGame(editPlayerAddress)
+                        .then(tx => tx.wait())
+                        .then(() => showToast("Game force-ended for player", "green"))
+                        .catch(err => {
+                          console.error(err);
+                          showToast("Failed to force end game", "red");
+                        });
+                    }
+                  }}>Force End</button>
+                </div>
+              </div>
+            )}
+            
+            <button 
+              onClick={resetGame} 
+              style={{ padding: "0.5rem 1rem", fontWeight: "bold", marginTop: "1rem" }}
+            >
+              Reset My Game
+            </button>
+          </div>
+        )}
+
+        <div style={{ marginBottom: "2rem" }}>
+          {!hasGame && (
+            <p style={{ color: "darkred", fontWeight: "bold" }}>
+              ⚠️ You don't have an active game yet. Place a bet to start.
+            </p>
+          )}
+
+          <div style={{ marginBottom: "1rem" }}>
+            <input
+              type="number"
+              placeholder="Enter bet in LUSD"
+              value={betAmount}
+              onChange={(e) => setBetAmount(e.target.value)}
+              style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
+            />
+            <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
+            {!isApproved && (
+              <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
+            )}
+          </div>
+        </div>
+
+        {/* Game Area */}
+        {hasGame && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
+            {/* Dealer's Cards */}
+            <div>
+              <h3>Dealer's Cards</h3>
+              <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                {dealerCard && (
+                  <div style={CARD_STYLE}>
+                    {dealerCard}
+                  </div>
+                )}
+                {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
+                  <div key={index} style={CARD_STYLE}>
+                    {card}
+                  </div>
+                ))}
+                {dealerFullHand.length > 0 && (
+                  <div style={{ 
+                    marginLeft: "1rem",
+                    fontWeight: "bold",
+                    fontSize: "1.2rem",
+                    color: getTotalColor(dealerTotal)
+                  }}>
+                    Total: {dealerTotal}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Player's Cards */}
+            <div>
+              <h3>Your Cards</h3>
+              <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+                {playerHand.map((card, index) => (
+                  <div key={index} style={CARD_STYLE}>
+                    {card}
+                  </div>
+                ))}
+                {handTotal !== null && (
+                  <div style={{ 
+                    marginLeft: "1rem",
+                    fontWeight: "bold",
+                    fontSize: "1.2rem",
+                    color: getTotalColor(handTotal)
+                  }}>
+                    Total: {handTotal}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Game Controls */}
+            <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
+              <button 
+                onClick={hit} 
+                disabled={gameState !== 1}
+                style={{ 
+                  padding: "0.75rem 2rem", 
+                  fontSize: "1.2rem", 
+                  fontWeight: "bold",
+                  backgroundColor: gameState === 1 ? "#4caf50" : "#e0e0e0"
+                }}
+              >
+                Hit
+              </button>
+              <button 
+                onClick={stand} 
+                disabled={gameState !== 1}
+                style={{ 
+                  padding: "0.75rem 2rem", 
+                  fontSize: "1.2rem", 
+                  fontWeight: "bold",
+                  backgroundColor: gameState === 1 ? "#f57c00" : "#e0e0e0"
+                }}
+              >
+                Stand
+              </button>
+            </div>
+          </div>
+        )}
+
+        {gameState === 3 && (
+          <button 
+            onClick={startNewGame}
+            style={{ 
+              padding: "0.75rem 2rem", 
+              fontSize: "1.2rem", 
+              fontWeight: "bold",
+              backgroundColor: "#2196f3",
+              color: "white",
+              borderRadius: "8px",
+              border: "none",
+              cursor: "pointer",
+              marginTop: "1rem"
+            }}
+          >
+            Start New Game
+          </button>
+        )}
       </div>
 
-      {/* Game Area */}
-      {hasGame && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
-          {/* Dealer's Cards */}
-          <div>
-            <h3>Dealer's Cards</h3>
-            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-              {dealerCard && (
-                <div style={CARD_STYLE}>
-                  {dealerCard}
-                </div>
-              )}
-              {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
-                <div key={index} style={CARD_STYLE}>
-                  {card}
-                </div>
-              ))}
-              {dealerFullHand.length > 0 && (
-                <div style={{ 
-                  marginLeft: "1rem",
-                  fontWeight: "bold",
-                  fontSize: "1.2rem",
-                  color: getTotalColor(dealerTotal)
-                }}>
-                  Total: {dealerTotal}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Player's Cards */}
-          <div>
-            <h3>Your Cards</h3>
-            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-              {playerHand.map((card, index) => (
-                <div key={index} style={CARD_STYLE}>
-                  {card}
-                </div>
-              ))}
-              {handTotal !== null && (
-                <div style={{ 
-                  marginLeft: "1rem",
-                  fontWeight: "bold",
-                  fontSize: "1.2rem",
-                  color: getTotalColor(handTotal)
-                }}>
-                  Total: {handTotal}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Game Controls */}
-          <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
-            <button 
-              onClick={hit} 
-              disabled={gameState !== 1}
-              style={{ 
-                padding: "0.75rem 2rem", 
-                fontSize: "1.2rem", 
-                fontWeight: "bold",
-                backgroundColor: gameState === 1 ? "#4caf50" : "#e0e0e0"
-              }}
-            >
-              Hit
-            </button>
-            <button 
-              onClick={stand} 
-              disabled={gameState !== 1}
-              style={{ 
-                padding: "0.75rem 2rem", 
-                fontSize: "1.2rem", 
-                fontWeight: "bold",
-                backgroundColor: gameState === 1 ? "#f57c00" : "#e0e0e0"
-              }}
-            >
-              Stand
-            </button>
-          </div>
-        </div>
-      )}
-
-      {gameState === 3 && (
-        <button 
-          onClick={startNewGame}
-          style={{ 
-            padding: "0.75rem 2rem", 
-            fontSize: "1.2rem", 
-            fontWeight: "bold",
-            backgroundColor: "#2196f3",
-            color: "white",
-            borderRadius: "8px",
-            border: "none",
-            cursor: "pointer",
-            marginTop: "1rem"
-          }}
-        >
-          Start New Game
-        </button>
-      )}
-
-      <div style={{ marginTop: "3rem", fontSize: "0.8rem", color: "#666" }}>
-        <p>🍊 Orange BlackJack — Play on the Ethereum blockchain</p>
+      <div style={{ marginTop: "3rem", fontSize: "0.8rem", color: "#666", textAlign: "center" }}>
+        <p>Orange BlackJack — Play on the Ethereum blockchain</p>
         <p>Game Contract: {GAME_CONTRACT_ADDRESS}</p>
         <p>Stats Contract: {STATS_CONTRACT_ADDRESS}</p>
         <p>Your Address: {walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}` : "Not connected"}</p>

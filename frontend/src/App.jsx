@@ -3,6 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-
 import SignIn from "./components/SignIn";
 import Game from "./components/Game";
 import InfoPage from "./components/InfoPage";
+import Leaderboard from "./components/Leaderboard"; // 👈 Add this
 import Navbar from "./components/Navbar";
 
 function App() {
@@ -19,7 +20,6 @@ function App() {
   }, [address]);
 
   useEffect(() => {
-    // Auto redirect based on sign-in state
     if (!address && location.pathname !== "/signin") {
       navigate("/signin", { replace: true });
     } else if (address && location.pathname === "/signin") {
@@ -34,6 +34,7 @@ function App() {
         <Route path="/signin" element={<SignIn setAddress={setAddress} />} />
         <Route path="/" element={<Game address={address} />} />
         <Route path="/about" element={<InfoPage />} />
+        <Route path="/leaderboard" element={<Leaderboard />} /> 
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>
