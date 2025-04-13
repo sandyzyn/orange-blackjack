@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from "../contract/OrangeBlackJack";
+import { GAME_CONTRACT_ADDRESS, STATS_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, STATS_CONTRACT_ABI } from "../contract/OrangeBlackJack";
 
 const LUSD_ADDRESS = "0x9142FA65aAEf921Aea2127e88758adeE0510a0F0";
 const OWNER_ADDRESS = "0x29821A88A2CB149b8519d38226f9A8c58Ab6cDA3".toLowerCase();
@@ -44,7 +44,8 @@ const Game = () => {
   const [playerHand, setPlayerHand] = useState([]);
   const [dealerCard, setDealerCard] = useState(null);
   const [dealerFullHand, setDealerFullHand] = useState([]);
-  const [contract, setContract] = useState(null);
+  const [gameContract, setGameContract] = useState(null);
+  const [statsContract, setStatsContract] = useState(null);
   const [LUSD, setLUSD] = useState(null);
   const [gameState, setGameState] = useState(0);
   const [walletAddress, setWalletAddress] = useState("");
@@ -57,8 +58,8 @@ const Game = () => {
   const [handTotal, setHandTotal] = useState(null);
   const [dealerTotal, setDealerTotal] = useState(null);
 
-  // New state variables for leaderboard and admin features
-  const [leaderboard, setLeaderboard] = useState({ address: "", profit: 0 });
+  // New state variables for enhanced features
+  const [leaderboardEntries, setLeaderboardEntries] = useState([]);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [editPlayerInput, setEditPlayerInput] = useState("");
   const [editPlayerAddress, setEditPlayerAddress] = useState("");
@@ -69,9 +70,15 @@ const Game = () => {
     ties: 0,
     blackjacks: 0,
     lifetimeEarnings: 0,
-    totalBets: 0
+    totalBets: 0,
+    biggestWin: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    gamesPlayed: 0,
+    name: ""
   });
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [gameOutcome, setGameOutcome] = useState({ status: "", result: "", payout: 0 });
 
   const showToast = (message, color) => {
     setToast({ message, color });
@@ -119,8 +126,12 @@ const Game = () => {
         setWalletAddress(user);
         setIsOwner(user.toLowerCase() === OWNER_ADDRESS);
 
-        const blackjack = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        setContract(blackjack);
+        // Initialize both contracts
+        const game = new ethers.Contract(GAME_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, signer);
+        setGameContract(game);
+        
+        const stats = new ethers.Contract(STATS_CONTRACT_ADDRESS, STATS_CONTRACT_ABI, signer);
+        setStatsContract(stats);
 
         const LUSD_ABI = [
           "function approve(address spender, uint256 amount) external returns (bool)",
@@ -131,10 +142,27 @@ const Game = () => {
         setLUSD(lusd);
 
         await checkLusdAllowanceAndBalance(lusd, user);
-        await fetchGameState(blackjack);
-        await checkIfPlayerHasGame(blackjack);
-        await fetchLeaderboard(blackjack);
-        await fetchPlayerStats(blackjack);
+        await fetchGameState(game, user);
+        await checkIfPlayerHasGame(game, user);
+        await fetchLeaderboard(stats);
+        await fetchPlayerStats(stats, user);
+        await fetchGameOutcome(game, user);
+        await fetchHands(game, user);
+        
+        // Set name to contract if available in localStorage
+        if (storedName) {
+          try {
+            // Check if name in contract matches localStorage
+            const contractName = await stats.getPlayerName(user);
+            if (contractName !== storedName) {
+              // Set name on the contract if different
+              await stats.setName(storedName);
+            }
+          } catch (err) {
+            console.error("Failed to set name:", err);
+          }
+        }
+        
         setStatus("✅ Wallet connected.");
       } catch (err) {
         console.error(err);
@@ -147,95 +175,154 @@ const Game = () => {
 
   const checkLusdAllowanceAndBalance = async (lusd, user) => {
     const balance = await lusd.balanceOf(user);
-    const allowance = await lusd.allowance(user, CONTRACT_ADDRESS);
+    const allowance = await lusd.allowance(user, GAME_CONTRACT_ADDRESS);
     setLusdBalance(ethers.formatUnits(balance, 18));
     setIsApproved(allowance >= ethers.parseUnits("100", 18));
   };
 
-  const checkIfPlayerHasGame = async (contractInstance) => {
+  const checkIfPlayerHasGame = async (gameInstance, playerAddress = walletAddress) => {
+    if (!playerAddress) return;
+    
     try {
-      const hand = await contractInstance.getMyHand();
-      setHasGame(hand.length > 0);
-    } catch {
+      const gameData = await gameInstance.getGameState(playerAddress);
+      setHasGame(gameData.pHand.length > 0 && (gameData.state === 1n || gameData.state === 2n));
+    } catch (err) {
+      console.error("Failed to check if player has game:", err);
       setHasGame(false);
     }
   };
 
-  const fetchGameState = async (instance = contract) => {
-    if (!instance) return;
+  const fetchGameState = async (instance = gameContract, playerAddress = walletAddress) => {
+    if (!instance || !playerAddress) return;
+    
     try {
-      const state = await instance.getGameState();
-      setGameState(Number(state));
+      const gameData = await instance.getGameState(playerAddress);
+      setGameState(Number(gameData.state));
     } catch (err) {
       console.error("Failed to get game state", err);
     }
   };
 
-  const fetchLeaderboard = async (instance = contract) => {
+  const fetchLeaderboard = async (instance = statsContract) => {
     if (!instance) return;
     try {
-      const [address, profit] = await instance.getTopPlayer();
-      setLeaderboard({
-        address: address,
-        profit: Number(ethers.formatUnits(profit, 18))
-      });
+      const topPlayers = await instance.getTopPlayers();
+      const formatted = topPlayers
+        .filter(entry => entry.player !== ethers.ZeroAddress)
+        .map(entry => ({
+          address: entry.player,
+          netProfit: Number(ethers.formatUnits(entry.netProfit, 18)),
+          name: entry.name
+        }));
+      setLeaderboardEntries(formatted);
     } catch (err) {
       console.error("Failed to fetch leaderboard", err);
     }
   };
 
-  const fetchPlayerStats = async (instance = contract) => {
-    if (!instance) return;
+  const fetchPlayerStats = async (instance = statsContract, playerAddress = walletAddress) => {
+    if (!instance || !playerAddress) return;
+    
     try {
-      const stats = await instance.getMyStats();
+      const stats = await instance.getStats(playerAddress);
       setPlayerStats({
         wins: Number(stats.wins),
         losses: Number(stats.losses),
         ties: Number(stats.ties),
         blackjacks: Number(stats.blackjacks),
-        lifetimeEarnings: Number(ethers.formatUnits(stats.lifetimeEarnings, 18)),
-        totalBets: Number(ethers.formatUnits(stats.totalBets, 18))
+        lifetimeEarnings: Number(ethers.formatUnits(stats.earnings, 18)),
+        totalBets: Number(ethers.formatUnits(stats.bets, 18)),
+        biggestWin: Number(ethers.formatUnits(stats.biggestWin, 18)),
+        currentStreak: Number(stats.streak),
+        longestStreak: Number(stats.longestStreak),
+        gamesPlayed: Number(stats.gamesPlayed),
+        name: stats.name || ""
       });
+      
+      // If we have a stored name but contract doesn't, update username in state
+      if (stats.name && stats.name !== username) {
+        setUsername(stats.name);
+        localStorage.setItem("playerName", stats.name);
+      }
     } catch (err) {
       console.error("Failed to fetch player stats", err);
     }
   };
 
-  const fetchHands = async () => {
-    if (!contract) return;
+  const fetchGameOutcome = async (instance = gameContract, playerAddress = walletAddress) => {
+    if (!instance || !playerAddress) return;
+    
     try {
-      const formattedHand = await contract.getFormattedMyHand();
-      const dealerFull = await contract.getFormattedDealerHand();
-      const state = await contract.getGameState();
+      const gameData = await instance.getGameState(playerAddress);
+      if (Number(gameData.state) === 3) { // Finished
+        setGameOutcome({
+          status: "Finished",
+          result: gameData.result,
+          payout: Number(ethers.formatUnits(gameData.payout, 18))
+        });
+      } else {
+        setGameOutcome({
+          status: GAME_STATES[Number(gameData.state)],
+          result: "",
+          payout: 0
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch game outcome", err);
+    }
+  };
 
-      setPlayerHand(formattedHand);
-      const myTotal = calculateHandTotal(formattedHand);
+  const fetchHands = async (instance = gameContract, playerAddress = walletAddress) => {
+    if (!instance || !playerAddress) return;
+    
+    try {
+      const gameData = await instance.getGameState(playerAddress);
+      
+      // Format the raw hand data to readable format
+      const formattedPlayerHand = formatHandData(gameData.pHand);
+      const formattedDealerHand = formatHandData(gameData.dHand);
+      
+      setPlayerHand(formattedPlayerHand);
+      const myTotal = calculateHandTotal(formattedPlayerHand);
       setHandTotal(myTotal);
 
-      if (Number(state) === 3) {
-        setDealerFullHand(dealerFull);
+      if (Number(gameData.state) === 3) { // Game finished
+        setDealerFullHand(formattedDealerHand);
         setDealerCard(null);
-        setDealerTotal(calculateHandTotal(dealerFull));
+        setDealerTotal(calculateHandTotal(formattedDealerHand));
       } else {
-        setDealerCard(dealerFull.length > 0 ? dealerFull[0] : null);
+        // During player's turn, only show the first dealer card
+        setDealerCard(formattedDealerHand.length > 0 ? formattedDealerHand[0] : null);
         setDealerFullHand([]);
         setDealerTotal(null);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch hands:", err);
       setStatus("❌ Failed to fetch hands.");
     }
   };
+  
+  // Helper function to format raw card numbers
+  const formatHandData = (handArray) => {
+    return handArray.map(card => {
+      const cardNum = Number(card);
+      if (cardNum === 1) return "Ace (1 or 11)";
+      if (cardNum === 11) return "Jack (10)";
+      if (cardNum === 12) return "Queen (10)";
+      if (cardNum === 13) return "King (10)";
+      return `${cardNum} (${cardNum})`;
+    });
+  };
 
   const resetGame = async () => {
-    if (!contract) return;
+    if (!gameContract) return;
     try {
-      const tx = await contract.forceEndGame(walletAddress);
+      const tx = await gameContract.forceEndGame(walletAddress);
       await tx.wait();
       setStatus("🔁 Game reset successfully.");
       await fetchGameState();
       await fetchHands();
-      await checkIfPlayerHasGame(contract);
+      await checkIfPlayerHasGame(gameContract);
       showToast("Game force-ended.", "gray");
     } catch (err) {
       console.error(err);
@@ -245,7 +332,7 @@ const Game = () => {
 
   const approveLUSD = async () => {
     try {
-      const tx = await LUSD.approve(CONTRACT_ADDRESS, ethers.parseUnits("1000", 18));
+      const tx = await LUSD.approve(GAME_CONTRACT_ADDRESS, ethers.parseUnits("100000000", 18));
       await tx.wait();
       setStatus("✅ Approved LUSD for betting.");
       setIsApproved(true);
@@ -256,58 +343,80 @@ const Game = () => {
   };
 
   const placeBet = async () => {
-    if (!contract || !isApproved) {
+    if (!gameContract || !isApproved) {
       setStatus("❌ Please approve LUSD before betting.");
       return;
     }
 
     try {
-      const state = await contract.getGameState();
-      if (Number(state) === 1 || Number(state) === 2) {
+      const gameData = await gameContract.getGameState(walletAddress);
+      if (Number(gameData.state) === 1 || Number(gameData.state) === 2) {
         setStatus("⚠️ You already have a game in progress.");
         return;
       }
 
       const amount = ethers.parseUnits(betAmount, 18);
-      const tx = await contract.placeBet(amount);
+      const tx = await gameContract.placeBet(amount);
+      setStatus("🎮 Placing bet...");
       await tx.wait();
+      
+      // Refresh all game data
       await fetchHands();
       await fetchGameState();
-      await checkIfPlayerHasGame(contract);
+      await checkIfPlayerHasGame(gameContract);
       await checkLusdAllowanceAndBalance(LUSD, walletAddress);
-      setStatus("🎲 Game started!");
+      await fetchGameOutcome();
+      await fetchPlayerStats();
+      
+      // Check if player got blackjack
+      const updatedGameData = await gameContract.getGameState(walletAddress);
+      if (updatedGameData.result === "Blackjack") {
+        const payout = Number(ethers.formatUnits(updatedGameData.payout, 18));
+        showToast(`🎰 BLACKJACK! You won ${payout} LUSD`, "green");
+        setStatus(`🎰 BLACKJACK! You won ${payout} LUSD`);
+      } else {
+        setStatus("🎲 Game started!");
+      }
     } catch (err) {
       console.error(err);
-      setStatus("❌ Bet failed: Please enter a valid number");
+      setStatus("❌ Bet failed: " + (err.reason || err.message || "Please enter a valid number"));
     }
   };
 
   const hit = async () => {
-    if (!contract || !hasGame) {
+    if (!gameContract || !hasGame) {
       setStatus("❌ No active game found.");
       return;
     }
 
     try {
-      const currentState = await contract.getGameState();
-      if (Number(currentState) !== 1) {
+      const gameData = await gameContract.getGameState(walletAddress);
+      if (Number(gameData.state) !== 1) {
         setStatus("❌ It's not your turn to hit.");
         return;
       }
 
-      const tx = await contract.hit();
+      const tx = await gameContract.hit();
+      setStatus("🎯 Hitting...");
       await tx.wait();
 
+      // Refresh game data
       await fetchHands();
       await fetchGameState();
-      await checkIfPlayerHasGame(contract);
+      await checkIfPlayerHasGame(gameContract);
+      await fetchGameOutcome();
 
-      const newState = await contract.getGameState();
-      if (Number(newState) === 3) {
-        setStatus("💥 You busted! Game over.");
-        showToast("💥 You busted!", "red");
-        await fetchPlayerStats(contract);
-        await fetchLeaderboard(contract);
+      const updatedGameData = await gameContract.getGameState(walletAddress);
+      if (Number(updatedGameData.state) === 3) {
+        if (updatedGameData.result === "Bust") {
+          setStatus("💥 You busted! Game over.");
+          showToast("💥 You busted!", "red");
+        } else {
+          setStatus(`🎮 Game over: ${updatedGameData.result}`);
+          showToast(`🎮 ${updatedGameData.result}`, updatedGameData.payout > 0 ? "green" : "red");
+        }
+        await fetchPlayerStats();
+        await fetchLeaderboard();
         await checkLusdAllowanceAndBalance(LUSD, walletAddress);
       } else {
         setStatus("🎯 Hit successful.");
@@ -319,57 +428,47 @@ const Game = () => {
   };
 
   const stand = async () => {
-    if (!contract || !hasGame) {
+    if (!gameContract || !hasGame) {
       setStatus("❌ No active game.");
       return;
     }
 
     try {
-      const currentState = await contract.getGameState();
-      if (Number(currentState) !== 1) {
+      const gameData = await gameContract.getGameState(walletAddress);
+      if (Number(gameData.state) !== 1) {
         setStatus("❌ It's not your turn to stand.");
         return;
       }
 
-      const tx = await contract.stand();
-      const receipt = await tx.wait();
+      const tx = await gameContract.stand();
+      setStatus("🛑 Standing...");
+      await tx.wait();
 
-      const iface = new ethers.Interface(CONTRACT_ABI);
-      const gameEndedTopic = iface.getEvent("GameEnded").topicHash;
-
-      const log = receipt.logs.find(
-        log => log.topics[0] === gameEndedTopic &&
-                log.address.toLowerCase() === CONTRACT_ADDRESS.toLowerCase()
-      );
-
-      if (log) {
-        const decoded = iface.decodeEventLog("GameEnded", log.data, log.topics);
-        const result = decoded.result;
-        const payout = decoded.payout;
-
-        if (result === "Player wins" || result === "Win") {
-          const gain = ethers.formatUnits(payout, 18);
-          setStatus(`🎉 You won! (+${gain} LUSD)`);
-          showToast(`🎉 You won! +${gain} LUSD`, "green");
-        } else if (result === "Dealer wins" || result === "Loss") {
-          setStatus("😢 Dealer wins.");
-          showToast("😢 Dealer wins.", "red");
-        } else if (result === "Tie") {
-          setStatus("🤝 It's a tie.");
-          showToast("🤝 It's a tie.", "gray");
-        } else {
-          setStatus(`🪙 Game ended: ${result}`);
-          showToast(`🪙 ${result}`, "gray");
-        }
-      } else {
-        setStatus("🛑 Game over, but no result found.");
-      }
-
+      // Refresh game data
       await fetchHands();
       await fetchGameState();
-      await checkIfPlayerHasGame(contract);
-      await fetchPlayerStats(contract);
-      await fetchLeaderboard(contract);
+      await checkIfPlayerHasGame(gameContract);
+      await fetchGameOutcome();
+
+      const updatedGameData = await gameContract.getGameState(walletAddress);
+      
+      if (updatedGameData.result === "Win") {
+        const gain = Number(ethers.formatUnits(updatedGameData.payout, 18));
+        setStatus(`🎉 You won! (+${gain} LUSD)`);
+        showToast(`🎉 You won! +${gain} LUSD`, "green");
+      } else if (updatedGameData.result === "Loss") {
+        setStatus("😢 Dealer wins.");
+        showToast("😢 Dealer wins.", "red");
+      } else if (updatedGameData.result === "Tie") {
+        setStatus("🤝 It's a tie.");
+        showToast("🤝 It's a tie.", "gray");
+      } else {
+        setStatus(`🪙 Game ended: ${updatedGameData.result}`);
+        showToast(`🪙 ${updatedGameData.result}`, "gray");
+      }
+
+      await fetchPlayerStats();
+      await fetchLeaderboard();
       await checkLusdAllowanceAndBalance(LUSD, walletAddress);
     } catch (err) {
       console.error("❌ Stand failed: ", err);
@@ -377,9 +476,9 @@ const Game = () => {
     }
   };
 
-  // New admin functions
+  // Admin functions
   const editPlayerHand = async () => {
-    if (!contract || !isOwner) return;
+    if (!gameContract || !isOwner) return;
     try {
       // Parse the input string to array of numbers
       const cards = editPlayerInput.split(",").map(card => parseInt(card.trim()));
@@ -389,7 +488,8 @@ const Game = () => {
         return;
       }
 
-      const tx = await contract.editPlayerHand(editPlayerAddress, cards);
+      // Note: The edit function has been combined in the contract
+      const tx = await gameContract.editHand(editPlayerAddress, true, cards);
       await tx.wait();
       showToast("✅ Player hand edited", "green");
       setEditPlayerInput("");
@@ -400,7 +500,7 @@ const Game = () => {
   };
 
   const editDealerHand = async () => {
-    if (!contract || !isOwner) return;
+    if (!gameContract || !isOwner) return;
     try {
       // Parse the input string to array of numbers
       const cards = editDealerInput.split(",").map(card => parseInt(card.trim()));
@@ -410,7 +510,8 @@ const Game = () => {
         return;
       }
 
-      const tx = await contract.editDealerHand(editPlayerAddress, cards);
+      // Note: The edit function has been combined in the contract
+      const tx = await gameContract.editHand(editPlayerAddress, false, cards);
       await tx.wait();
       showToast("✅ Dealer hand edited", "green");
       setEditDealerInput("");
@@ -421,10 +522,10 @@ const Game = () => {
   };
 
   const withdrawFunds = async () => {
-    if (!contract || !isOwner) return;
+    if (!gameContract || !isOwner) return;
     try {
       const amount = ethers.parseUnits(withdrawAmount, 18);
-      const tx = await contract.withdrawAmount(amount);
+      const tx = await gameContract.withdraw(amount);
       await tx.wait();
       showToast(`✅ Withdrew ${withdrawAmount} LUSD`, "green");
       setWithdrawAmount("");
@@ -435,9 +536,9 @@ const Game = () => {
   };
 
   const withdrawAllFunds = async () => {
-    if (!contract || !isOwner) return;
+    if (!gameContract || !isOwner) return;
     try {
-      const tx = await contract.withdrawAll();
+      const tx = await gameContract.withdraw(0); // 0 means withdraw all in the new contract
       await tx.wait();
       showToast("✅ All funds withdrawn", "green");
     } catch (err) {
@@ -456,10 +557,23 @@ const Game = () => {
     setStatus("🎲 Ready to place a new bet.");
   };
 
-  const saveUsername = () => {
+  const saveUsername = async () => {
     if (username.trim()) {
-      localStorage.setItem("playerName", username);
-      showToast(`Username saved as ${username}`, "green");
+      try {
+        localStorage.setItem("playerName", username);
+        
+        if (statsContract) {
+          const tx = await statsContract.setName(username);
+          await tx.wait();
+          await fetchLeaderboard(statsContract);
+          showToast(`Username saved as ${username}`, "green");
+        } else {
+          showToast(`Username saved locally as ${username}`, "green");
+        }
+      } catch (err) {
+        console.error("Failed to set name on contract:", err);
+        showToast("Saved name locally, but failed to update on blockchain", "orange");
+      }
     }
   };
 
@@ -492,11 +606,15 @@ const Game = () => {
       {/* Stats Panel */}
       <div style={{ marginBottom: "2rem", backgroundColor: "#fff3e0", padding: "1rem", borderRadius: "8px" }}>
         <h3>📊 Your Stats</h3>
-        <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: "0.5rem" }}>
           <div><strong>Wins:</strong> {playerStats.wins}</div>
           <div><strong>Losses:</strong> {playerStats.losses}</div>
           <div><strong>Ties:</strong> {playerStats.ties}</div>
           <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
+          <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
+          <div><strong>Current Streak:</strong> {playerStats.currentStreak}</div>
+          <div><strong>Longest Streak:</strong> {playerStats.longestStreak}</div>
+          <div><strong>Biggest Win:</strong> {playerStats.biggestWin.toFixed(2)} LUSD</div>
           <div><strong>Lifetime Earnings:</strong> {playerStats.lifetimeEarnings.toFixed(2)} LUSD</div>
           <div><strong>Total Bets:</strong> {playerStats.totalBets.toFixed(2)} LUSD</div>
           <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
@@ -508,9 +626,73 @@ const Game = () => {
       {/* Leaderboard */}
       <div style={{ marginBottom: "2rem", backgroundColor: "#ffecb3", padding: "1rem", borderRadius: "8px" }}>
         <h3>🏆 Leaderboard</h3>
-        <p><strong>Top Player:</strong> {leaderboard.address.substring(0, 6)}...{leaderboard.address.substring(38)}</p>
-        <p><strong>Net Profit:</strong> {leaderboard.profit.toFixed(2)} LUSD</p>
+        {leaderboardEntries.length > 0 ? (
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Rank</th>
+                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Player</th>
+                <th style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>Net Profit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leaderboardEntries.map((entry, index) => (
+                <tr key={index} style={{ 
+                  backgroundColor: entry.address.toLowerCase() === walletAddress.toLowerCase() ? "#ffe0b2" : "transparent" 
+                }}>
+                  <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
+                    {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
+                  </td>
+                  <td style={{ padding: "0.5rem", borderBottom: "1px solid #eee" }}>
+                    {entry.address.toLowerCase() === walletAddress.toLowerCase() 
+                      ? <strong>{username || "You"}</strong> 
+                      : entry.name || `${entry.address.substring(0, 6)}...${entry.address.substring(38)}`}
+                  </td>
+                  <td style={{ 
+                    padding: "0.5rem", 
+                    borderBottom: "1px solid #eee",
+                    color: entry.netProfit >= 0 ? "green" : "red",
+                    fontWeight: "bold"
+                  }}>
+                    {entry.netProfit.toFixed(2)} LUSD
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p>No players on the leaderboard yet. Be the first!</p>
+        )}
       </div>
+
+      {/* Last Game Result */}
+      {gameOutcome.status === "Finished" && gameOutcome.result && (
+        <div style={{ 
+          marginBottom: "2rem", 
+          backgroundColor: gameOutcome.payout > 0 ? "#e8f5e9" : "#ffebee", 
+          padding: "1rem", 
+          borderRadius: "8px" 
+        }}>
+          <h3>🎮 Last Game Result</h3>
+          <p style={{ 
+            fontWeight: "bold", 
+            fontSize: "1.2rem",
+            color: gameOutcome.payout > 0 ? "green" : (gameOutcome.result === "Tie" ? "gray" : "red")
+          }}>
+            {gameOutcome.result === "Win" ? "You won!" : 
+             gameOutcome.result === "Loss" ? "Dealer won" :
+             gameOutcome.result === "Tie" ? "It was a tie" :
+             gameOutcome.result === "Blackjack" ? "BLACKJACK!" :
+             gameOutcome.result === "Bust" ? "You busted" :
+             gameOutcome.result}
+          </p>
+          {gameOutcome.payout > 0 && (
+            <p style={{ color: "green", fontWeight: "bold" }}>
+              Payout: +{gameOutcome.payout.toFixed(2)} LUSD
+            </p>
+          )}
+        </div>
+      )}
 
       {isOwner && (
         <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
@@ -532,7 +714,7 @@ const Game = () => {
                   value={editPlayerAddress}
                   onChange={(e) => setEditPlayerAddress(e.target.value)}
                   style={{ width: "300px", padding: "0.5rem", marginRight: "0.5rem" }}
-                />
+                  />
                 <input
                   type="text"
                   placeholder="Cards (e.g. 1,10,5)"
@@ -586,7 +768,7 @@ const Game = () => {
                 />
                 <button onClick={() => {
                   if (editPlayerAddress) {
-                    contract.forceEndGame(editPlayerAddress)
+                    gameContract.forceEndGame(editPlayerAddress)
                       .then(tx => tx.wait())
                       .then(() => showToast("Game force-ended for player", "green"))
                       .catch(err => {
@@ -624,90 +806,118 @@ const Game = () => {
             style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
           />
           <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
-          <button onClick={approveLUSD} disabled={isApproved} style={{ marginLeft: "0.5rem" }}>
-            Approve LUSD
-          </button>
+          {!isApproved && (
+            <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
+          )}
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap" }}>
-        <div style={{ flex: "1", minWidth: "300px", marginRight: "1rem" }}>
-          <h2 style={{ color: getTotalColor(handTotal) }}>
-            🧑 Your Hand {handTotal !== null && `(Total: ${handTotal})`}
-          </h2>
-          <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "1rem", flexWrap: "wrap" }}>
-            {playerHand.length > 0
-              ? playerHand.map((card, i) => (
-                  <div key={i} style={CARD_STYLE}>{card}</div>
-                ))
-              : <p>No cards yet</p>}
+      {/* Game Area */}
+      {hasGame && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
+          {/* Dealer's Cards */}
+          <div>
+            <h3>Dealer's Cards</h3>
+            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+              {dealerCard && (
+                <div style={CARD_STYLE}>
+                  {dealerCard}
+                </div>
+              )}
+              {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
+                <div key={index} style={CARD_STYLE}>
+                  {card}
+                </div>
+              ))}
+              {dealerFullHand.length > 0 && (
+                <div style={{ 
+                  marginLeft: "1rem",
+                  fontWeight: "bold",
+                  fontSize: "1.2rem",
+                  color: getTotalColor(dealerTotal)
+                }}>
+                  Total: {dealerTotal}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Player's Cards */}
+          <div>
+            <h3>Your Cards</h3>
+            <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
+              {playerHand.map((card, index) => (
+                <div key={index} style={CARD_STYLE}>
+                  {card}
+                </div>
+              ))}
+              {handTotal !== null && (
+                <div style={{ 
+                  marginLeft: "1rem",
+                  fontWeight: "bold",
+                  fontSize: "1.2rem",
+                  color: getTotalColor(handTotal)
+                }}>
+                  Total: {handTotal}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Game Controls */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
+            <button 
+              onClick={hit} 
+              disabled={gameState !== 1}
+              style={{ 
+                padding: "0.75rem 2rem", 
+                fontSize: "1.2rem", 
+                fontWeight: "bold",
+                backgroundColor: gameState === 1 ? "#4caf50" : "#e0e0e0"
+              }}
+            >
+              Hit
+            </button>
+            <button 
+              onClick={stand} 
+              disabled={gameState !== 1}
+              style={{ 
+                padding: "0.75rem 2rem", 
+                fontSize: "1.2rem", 
+                fontWeight: "bold",
+                backgroundColor: gameState === 1 ? "#f57c00" : "#e0e0e0"
+              }}
+            >
+              Stand
+            </button>
           </div>
         </div>
+      )}
 
-        <div style={{ flex: "1", minWidth: "300px" }}>
-          <h2 style={{ color: getTotalColor(dealerTotal) }}>
-            🃏 Dealer's Hand {dealerTotal !== null && `(Total: ${dealerTotal})`}
-          </h2>
-          <div style={{ display: "flex", justifyContent: "center", gap: "10px", marginBottom: "1.5rem", flexWrap: "wrap" }}>
-            {dealerFullHand.length > 0 ? (
-              dealerFullHand.map((card, i) => (
-                <div key={i} style={CARD_STYLE}>{card}</div>
-              ))
-            ) : dealerCard !== null ? (
-              <div style={CARD_STYLE}>{dealerCard}</div>
-            ) : (
-              <p>No card revealed yet</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "2rem" }}>
-        <button 
-          onClick={hit} 
-          disabled={gameState !== 1 || !hasGame}
-          style={{ 
-            padding: "0.75rem 2rem", 
-            fontSize: "1.2rem",
-            backgroundColor: gameState === 1 && hasGame ? "#4caf50" : "#cccccc",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: gameState === 1 && hasGame ? "pointer" : "not-allowed"
-          }}
-        >
-          Hit
-        </button>
-        <button 
-          onClick={stand} 
-          disabled={gameState !== 1 || !hasGame}
-          style={{ 
-            padding: "0.75rem 2rem", 
-            fontSize: "1.2rem",
-            backgroundColor: gameState === 1 && hasGame ? "#f57c00" : "#cccccc",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: gameState === 1 && hasGame ? "pointer" : "not-allowed"
-          }}
-        >
-          Stand
-        </button>
+      {gameState === 3 && (
         <button 
           onClick={startNewGame}
-          disabled={gameState === 1 || gameState === 2}
           style={{ 
             padding: "0.75rem 2rem", 
-            fontSize: "1.2rem",
-            backgroundColor: gameState !== 1 && gameState !== 2 ? "#2196f3" : "#cccccc",
+            fontSize: "1.2rem", 
+            fontWeight: "bold",
+            backgroundColor: "#2196f3",
             color: "white",
+            borderRadius: "8px",
             border: "none",
-            borderRadius: "4px",
-            cursor: gameState !== 1 && gameState !== 2 ? "pointer" : "not-allowed"
+            cursor: "pointer",
+            marginTop: "1rem"
           }}
         >
-          New Game
+          Start New Game
         </button>
+      )}
+
+      <div style={{ marginTop: "3rem", fontSize: "0.8rem", color: "#666" }}>
+        <p>🍊 Orange BlackJack — Play on the Ethereum blockchain</p>
+        <p>Game Contract: {GAME_CONTRACT_ADDRESS}</p>
+        <p>Stats Contract: {STATS_CONTRACT_ADDRESS}</p>
+        <p>Your Address: {walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}` : "Not connected"}</p>
       </div>
     </div>
   );
