@@ -2,24 +2,49 @@ import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { GAME_CONTRACT_ADDRESS, STATS_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, STATS_CONTRACT_ABI } from "../contract/OrangeBlackJack";
 
+
+const CardAnimationStyles = () => (
+  <style dangerouslySetInnerHTML={{ __html: `
+    @keyframes victory {
+      0% { opacity: 0; transform: scale(0.5); }
+      25% { opacity: 0.5; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.2); }
+      75% { opacity: 0.8; transform: scale(1.1); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+    
+    @keyframes defeat {
+      0% { opacity: 0; transform: scale(0.5); }
+      25% { opacity: 0.5; transform: scale(0.8); rotate(-3deg); }
+      50% { opacity: 1; transform: scale(1.2) rotate(-5deg); }
+      75% { opacity: 0.8; transform: scale(1.1) rotate(-3deg); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+  `}} />
+);
+
 const LUSD_ADDRESS = "0x9142FA65aAEf921Aea2127e88758adeE0510a0F0";
 const OWNER_ADDRESS = "0x29821A88A2CB149b8519d38226f9A8c58Ab6cDA3".toLowerCase();
 const GAME_STATES = ["NotStarted", "PlayerTurn", "DealerTurn", "Finished"];
 
 const CARD_STYLE = {
-  width: "80px",
-  height: "100px",
+  width: "90px",
+  height: "130px",
   backgroundColor: "white",
-  border: "1px solid black",
-  borderRadius: "8px",
+  border: "1px solid #ccc",
+  borderRadius: "10px",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   fontSize: "0.9rem",
   fontWeight: "bold",
   padding: "0.5rem",
-  textAlign: "center"
+  textAlign: "center",
+  margin: "0 10px",
+  boxShadow: "0 4px 8px rgba(0,0,0,0.2)",
+  background: "linear-gradient(135deg, #fff 0%, #f8f8f8 50%, #eee 100%)"
 };
+
 
 const formatLargeNumber = (num) => {
   if (num >= 1e9) {
@@ -30,7 +55,6 @@ const formatLargeNumber = (num) => {
     return Number(num).toFixed(2);
   }
 };
-
 const Toast = ({ message, color }) => (
   <div style={{
     position: 'fixed',
@@ -67,6 +91,7 @@ const Game = () => {
   const [isOwner, setIsOwner] = useState(false);
   const [handTotal, setHandTotal] = useState(null);
   const [dealerTotal, setDealerTotal] = useState(null);
+  const [showOutcomeAnimation, setShowOutcomeAnimation] = useState("");
 
   // New state variables for enhanced features
   const [leaderboardEntries, setLeaderboardEntries] = useState([]);
@@ -117,7 +142,6 @@ const Game = () => {
     if (total === 21) return "green";
     return "#111827";
   };
-
   useEffect(() => {
     const storedName = localStorage.getItem("playerName");
     if (storedName) setUsername(storedName);
@@ -225,7 +249,6 @@ const Game = () => {
       console.error("Failed to fetch leaderboard", err);
     }
   };
-
   const fetchPlayerStats = async (instance = statsContract, playerAddress = walletAddress) => {
     if (!instance || !playerAddress) return;
     
@@ -326,7 +349,6 @@ const Game = () => {
       return `${cardNum} (${cardNum})`;
     });
   };
-
   const resetGame = async () => {
     if (!gameContract) return;
     try {
@@ -360,14 +382,14 @@ const Game = () => {
       setStatus("❌ Please approve LUSD before betting.");
       return;
     }
-
+  
     try {
       const gameData = await gameContract.getGameState(walletAddress);
       if (Number(gameData.state) === 1 || Number(gameData.state) === 2) {
         setStatus("⚠️ You already have a game in progress.");
         return;
       }
-
+  
       const amount = ethers.parseUnits(betAmount, 18);
       const tx = await gameContract.placeBet(amount);
       setStatus("🎮 Placing bet...");
@@ -387,6 +409,8 @@ const Game = () => {
         const payout = formatLargeNumber(Number(ethers.formatUnits(updatedGameData.payout, 18)));
         showToast(`🎰 BLACKJACK! You won ${payout} LUSD`, "green");
         setStatus(`🎰 BLACKJACK! You won ${payout} LUSD`);
+        setShowOutcomeAnimation("win");
+        setTimeout(() => setShowOutcomeAnimation(""), 6000);
       } else {
         setStatus("🎲 Game started!");
       }
@@ -401,29 +425,36 @@ const Game = () => {
       setStatus("❌ No active game found.");
       return;
     }
-
+  
     try {
       const gameData = await gameContract.getGameState(walletAddress);
       if (Number(gameData.state) !== 1) {
         setStatus("❌ It's not your turn to hit.");
         return;
       }
-
+  
       const tx = await gameContract.hit();
       setStatus("🎯 Hitting...");
       await tx.wait();
-
+  
       // Refresh game data
       await fetchHands();
       await fetchGameState();
       await checkIfPlayerHasGame(gameContract);
       await fetchGameOutcome();
-
+  
       const updatedGameData = await gameContract.getGameState(walletAddress);
       if (Number(updatedGameData.state) === 3) {
         if (updatedGameData.result === "Bust") {
           setStatus("💥 You busted! Game over.");
           showToast("💥 You busted!", "red");
+          setShowOutcomeAnimation("loss");
+          setTimeout(() => setShowOutcomeAnimation(""), 6000);
+        } else if (updatedGameData.result === "Win") {
+          setStatus(`🎮 You won!`);
+          showToast(`🎮 You won!`, "green");
+          setShowOutcomeAnimation("win");
+          setTimeout(() => setShowOutcomeAnimation(""), 6000);
         } else {
           setStatus(`🎮 Game over: ${updatedGameData.result}`);
           showToast(`🎮 ${updatedGameData.result}`, updatedGameData.payout > 0 ? "green" : "red");
@@ -445,33 +476,35 @@ const Game = () => {
       setStatus("❌ No active game.");
       return;
     }
-
+  
     try {
       const gameData = await gameContract.getGameState(walletAddress);
       if (Number(gameData.state) !== 1) {
         setStatus("❌ It's not your turn to stand.");
         return;
       }
-
+  
       const tx = await gameContract.stand();
       setStatus("🛑 Standing...");
       await tx.wait();
-
+  
       // Refresh game data
       await fetchHands();
       await fetchGameState();
       await checkIfPlayerHasGame(gameContract);
       await fetchGameOutcome();
-
+  
       const updatedGameData = await gameContract.getGameState(walletAddress);
       
       if (updatedGameData.result === "Win") {
         const gain = formatLargeNumber(Number(ethers.formatUnits(updatedGameData.payout, 18)));
         setStatus(`🎉 You won! (+${gain} LUSD)`);
         showToast(`🎉 You won! +${gain} LUSD`, "green");
+        setShowOutcomeAnimation("win");
       } else if (updatedGameData.result === "Loss") {
         setStatus("😢 Dealer wins.");
         showToast("😢 Dealer wins.", "red");
+        setShowOutcomeAnimation("loss");
       } else if (updatedGameData.result === "Tie") {
         setStatus("🤝 It's a tie.");
         showToast("🤝 It's a tie.", "gray");
@@ -479,7 +512,10 @@ const Game = () => {
         setStatus(`🪙 Game ended: ${updatedGameData.result}`);
         showToast(`🪙 ${updatedGameData.result}`, "gray");
       }
-
+      
+      // Reset outcome animation after 6 seconds
+      setTimeout(() => setShowOutcomeAnimation(""), 6000);
+  
       await fetchPlayerStats();
       await fetchLeaderboard();
       await checkLusdAllowanceAndBalance(LUSD, walletAddress);
@@ -533,7 +569,6 @@ const Game = () => {
       showToast("❌ Failed to edit dealer hand", "red");
     }
   };
-
   const withdrawFunds = async () => {
     if (!gameContract || !isOwner) return;
     try {
@@ -595,9 +630,59 @@ const Game = () => {
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#fefefe", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px" }}>
-      {toast.message && <Toast message={toast.message} color={toast.color} />}
+    <CardAnimationStyles />
+    {toast.message && <Toast message={toast.message} color={toast.color} />}
+    
+    {showOutcomeAnimation === "win" && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'rgba(0,0,0,0.7)',
+        zIndex: 9999
+      }}>
+        <div style={{
+          fontSize: '4rem',
+          color: 'gold',
+          textShadow: '0 0 15px rgba(255,215,0,0.7), 0 0 25px rgba(255,215,0,0.5)',
+          animation: 'victory 3s ease-in-out',
+          fontWeight: 'bold'
+        }}>
+          YOU WIN!
+        </div>
+      </div>
+    )}
 
-      <div style={{ maxWidth: "900px", backgroundColor: "white", padding: "32px", borderRadius: "12px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+    {showOutcomeAnimation === "loss" && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'rgba(0,0,0,0.7)',
+        zIndex: 9999
+      }}>
+        <div style={{
+          fontSize: '4rem',
+          color: 'red',
+          textShadow: '0 0 15px rgba(255,0,0,0.7), 0 0 25px rgba(255,0,0,0.5)',
+          animation: 'defeat 3s ease-in-out',
+          fontWeight: 'bold'
+        }}>
+          DEALER WINS
+        </div>
+      </div>
+    )}
+  <div style={{ maxWidth: "900px", backgroundColor: "white", padding: "32px", borderRadius: "12px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
         <h1 style={{ fontSize: "28px", fontWeight: "600", marginBottom: "20px", color: "#f97316", textAlign: "center", fontFamily: "Georgia, serif" }}>
           Orange BlackJack
         </h1>
@@ -636,7 +721,6 @@ const Game = () => {
             </div>
           </div>
         </div>
-
         {isOwner && (
   <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
     <h3>🔧 Admin Controls</h3>
@@ -684,9 +768,8 @@ const Game = () => {
             </button>
           </div>
         </div>
-        
-        {/* Player Management */}
-        <div style={{ width: "100%", padding: "1rem", backgroundColor: "#f0f8ff", borderRadius: "8px" }}>
+{/* Player Management */}
+<div style={{ width: "100%", padding: "1rem", backgroundColor: "#f0f8ff", borderRadius: "8px" }}>
           <h4 style={{ marginBottom: "0.5rem" }}>Player Management</h4>
           <div>
             <input
@@ -752,9 +835,8 @@ const Game = () => {
             </button>
           </div>
         </div>
-        
-        {/* Edit Hands */}
-        <div>
+{/* Edit Hands */}
+<div>
           <h4>Edit Player's Hand</h4>
           <input
             type="text"
@@ -804,7 +886,6 @@ const Game = () => {
           <button onClick={withdrawFunds} style={{ marginRight: "0.5rem" }}>Withdraw Amount</button>
           <button onClick={withdrawAllFunds}>Withdraw All</button>
         </div>
-        
         <div>
           <h4>Force End Game</h4>
           <input
@@ -851,13 +932,13 @@ const Game = () => {
                     </td>
                     <td style={{ padding: "0.5rem", borderBottom: "1px solid #ddd" }}>{entry.name || "Anonymous"}</td>
                     <td style={{ 
-                    padding: "0.5rem", 
-                    borderBottom: "1px solid #ddd", 
-                    textAlign: "right",
-                    color: entry.netProfit >= 0 ? "green" : "red"
-                  }}>
-                    {formatLargeNumber(Number(entry.netProfit))} LUSD
-                  </td>
+                      padding: "0.5rem", 
+                      borderBottom: "1px solid #ddd", 
+                      textAlign: "right",
+                      color: entry.netProfit >= 0 ? "green" : "red"
+                    }}>
+                      {formatLargeNumber(Number(entry.netProfit))} LUSD
+                    </td>
                   </tr>
                 ))}
                 {leaderboardEntries.length === 0 && (
@@ -880,8 +961,7 @@ const Game = () => {
     </button>
   </div>
 )}
-
-        <div style={{ marginBottom: "2rem" }}>
+<div style={{ marginBottom: "2rem" }}>
           {!hasGame && (
             <p style={{ color: "darkred", fontWeight: "bold" }}>
               ⚠️ You don't have an active game yet. Place a bet to start.
@@ -907,56 +987,61 @@ const Game = () => {
         {(hasGame || gameState === 3) && (
           <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
             {/* Dealer's Cards */}
-            <div>
-              <h3>Dealer's Cards</h3>
-              <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-                {dealerCard && (
-                  <div style={CARD_STYLE}>
-                    {dealerCard}
-                  </div>
-                )}
-                {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
-                  <div key={index} style={CARD_STYLE}>
-                    {card}
-                  </div>
-                ))}
-                {dealerTotal !== null && (
-                  <div style={{ 
-                    marginLeft: "1rem",
-                    fontWeight: "bold",
-                    fontSize: "1.2rem",
-                    color: getTotalColor(dealerTotal)
-                  }}>
-                    Total: {dealerTotal}
-                  </div>
-                )}
-              </div>
-            </div>
+<div>
+  <h3>Dealer's Cards</h3>
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "1rem", minHeight: "150px" }}>
+    {dealerCard && gameState !== 3 && (
+      <div style={CARD_STYLE}>
+        {dealerCard}
+      </div>
+    )}
+    {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
+      <div 
+        key={index}
+        style={CARD_STYLE}
+      >
+        {card}
+      </div>
+    ))}
+    {dealerTotal !== null && (
+      <div style={{ 
+        marginLeft: "1rem",
+        fontWeight: "bold",
+        fontSize: "1.2rem",
+        color: getTotalColor(dealerTotal)
+      }}>
+        Total: {dealerTotal}
+      </div>
+    )}
+  </div>
+</div>
 
             {/* Player's Cards */}
-            <div>
-              <h3>Your Cards</h3>
-              <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginTop: "0.5rem" }}>
-                {playerHand.map((card, index) => (
-                  <div key={index} style={CARD_STYLE}>
-                    {card}
-                  </div>
-                ))}
-                {handTotal !== null && (
-                  <div style={{ 
-                    marginLeft: "1rem",
-                    fontWeight: "bold",
-                    fontSize: "1.2rem",
-                    color: getTotalColor(handTotal)
-                  }}>
-                    Total: {handTotal}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Game Outcome Display */}
-            {gameState === 3 && gameOutcome.result && (
+<div>
+  <h3>Your Cards</h3>
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "1rem", minHeight: "150px" }}>
+    {playerHand.map((card, index) => (
+      <div 
+        key={index}
+        style={CARD_STYLE}
+      >
+        {card}
+      </div>
+    ))}
+    {handTotal !== null && (
+      <div style={{ 
+        marginLeft: "1rem",
+        fontWeight: "bold",
+        fontSize: "1.2rem",
+        color: getTotalColor(handTotal)
+      }}>
+        Total: {handTotal}
+      </div>
+    )}
+  </div>
+</div>
+{/* Game Outcome Display */}
+{gameState === 3 && gameOutcome.result && (
               <div style={{ 
                 marginTop: "1rem", 
                 padding: "1rem", 
@@ -971,10 +1056,10 @@ const Game = () => {
               }}>
                 <div>Result: {gameOutcome.result}</div>
                 {gameOutcome.payout > 0 && (
-                <div style={{ color: "green", marginTop: "0.5rem" }}>
-                  Payout: {formatLargeNumber(Number(gameOutcome.payout))} LUSD
-                </div>
-              )}
+                  <div style={{ color: "green", marginTop: "0.5rem" }}>
+                    Payout: {formatLargeNumber(Number(gameOutcome.payout))} LUSD
+                  </div>
+                )}
               </div>
             )}
 
