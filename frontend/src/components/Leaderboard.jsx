@@ -62,10 +62,10 @@ const Leaderboard = () => {
                   <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center" }}>
                     {index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
                   </td>
-                  <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center", fontWeight: "bold" }}>
+                  <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center"}}>
                     {entry.name || `${entry.address.substring(0, 6)}...${entry.address.substring(38)}`}
                   </td>
-                  <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center", color: entry.netProfit >= 0 ? "green" : "red", fontWeight: "bold" }}>
+                  <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center", color: entry.netProfit >= 0 ? "green" : "red" }}>
                     {entry.netProfit.toFixed(2)} LUSD
                   </td>
                 </tr>
