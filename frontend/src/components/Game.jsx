@@ -683,9 +683,9 @@ const Game = () => {
       </div>
     )}
   <div style={{ maxWidth: "900px", backgroundColor: "white", padding: "32px", borderRadius: "12px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <h1 style={{ fontSize: "36px", fontWeight: "600", marginBottom: "20px", color: "#f97316", textAlign: "center", fontFamily: "Georgia, serif" }}>
-          Orange BlackJack
-        </h1>
+      <h1 style={{ fontSize: "36px", fontWeight: "600", marginBottom: "20px", textAlign: "center", fontFamily: "Georgia, serif" }}>
+        <span style={{ color: "#f97316" }}>Orange</span> <span style={{ color: "#000000" }}>BlackJack</span>
+      </h1>
         
         {/* Only show username input if not connected to wallet */}
         {!walletAddress && (
