@@ -683,7 +683,7 @@ const Game = () => {
       </div>
     )}
   <div style={{ maxWidth: "900px", backgroundColor: "white", padding: "32px", borderRadius: "12px", boxShadow: "0 4px 8px rgba(0,0,0,0.1)", width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <h1 style={{ fontSize: "28px", fontWeight: "600", marginBottom: "20px", color: "#f97316", textAlign: "center", fontFamily: "Georgia, serif" }}>
+        <h1 style={{ fontSize: "36px", fontWeight: "600", marginBottom: "20px", color: "#f97316", textAlign: "center", fontFamily: "Georgia, serif" }}>
           Orange BlackJack
         </h1>
         
@@ -962,84 +962,124 @@ const Game = () => {
   </div>
 )}
 <div style={{ marginBottom: "2rem" }}>
-          {!hasGame && (
-            <p style={{ color: "darkred", fontWeight: "bold" }}>
-              ⚠️ You don't have an active game yet. Place a bet to start.
-            </p>
-          )}
+  {!hasGame && (
+    <p style={{ color: "darkred", fontWeight: "bold" }}>
+      ⚠️ You don't have an active game yet. Place a bet to start.
+    </p>
+  )}
 
-          <div style={{ marginBottom: "1rem" }}>
-            <input
-              type="number"
-              placeholder="Enter bet in LUSD"
-              value={betAmount}
-              onChange={(e) => setBetAmount(e.target.value)}
-              style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
-            />
-            <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
-            {!isApproved && (
-              <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
-            )}
-          </div>
-        </div>
+  <div style={{ marginBottom: "1rem" }}>
+    <input
+      type="number"
+      placeholder="Enter bet in LUSD"
+      value={betAmount}
+      onChange={(e) => setBetAmount(e.target.value)}
+      style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
+    />
+    <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
+    {!isApproved && (
+      <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
+    )}
+  </div>
+</div>
 
-        {/* Game Area */}
-        {(hasGame || gameState === 3) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
-            {/* Dealer's Cards */}
+{/* Game Area */}
+{(hasGame || gameState === 3) && (
+  <div style={{ display: "flex", flexDirection: "column", gap: "2rem", marginBottom: "2rem" }}>
+
+{/* Dealer's Cards */}
 <div>
   <h3>Dealer's Cards</h3>
-  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "1rem", minHeight: "150px" }}>
-    {dealerCard && gameState !== 3 && (
-      <div style={CARD_STYLE}>
-        {dealerCard}
-      </div>
-    )}
-    {dealerFullHand.length > 0 && dealerFullHand.map((card, index) => (
-      <div 
-        key={index}
-        style={CARD_STYLE}
-      >
-        {card}
-      </div>
-    ))}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "0.5rem",
+      marginTop: "1rem",
+      minHeight: "150px",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: "1rem",
+      }}
+    >
+      {dealerCard && gameState !== 3 && (
+        <div style={CARD_STYLE}>
+          {dealerCard}
+        </div>
+      )}
+      {dealerFullHand.length > 0 &&
+        dealerFullHand.map((card, index) => (
+          <div key={index} style={CARD_STYLE}>
+            {card}
+          </div>
+        ))}
+    </div>
+    <p></p>
+
     {dealerTotal !== null && (
-      <div style={{ 
-        marginLeft: "1rem",
-        fontWeight: "bold",
-        fontSize: "1.2rem",
-        color: getTotalColor(dealerTotal)
-      }}>
+      <div
+        style={{
+          fontWeight: "bold",
+          fontSize: "1.2rem",
+          color: getTotalColor(dealerTotal),
+        }}
+      >
         Total: {dealerTotal}
       </div>
     )}
   </div>
 </div>
 
-            {/* Player's Cards */}
+
+{/* Player's Cards */}
 <div>
   <h3>Your Cards</h3>
-  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1rem", marginTop: "1rem", minHeight: "150px" }}>
-    {playerHand.map((card, index) => (
-      <div 
-        key={index}
-        style={CARD_STYLE}
-      >
-        {card}
-      </div>
-    ))}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "0.5rem",
+      marginTop: "1rem",
+      minHeight: "150px",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: "1rem",
+      }}
+    >
+      {playerHand.map((card, index) => (
+        <div key={index} style={CARD_STYLE}>
+          {card}
+        </div>
+      ))}
+    </div>
+    <p></p>
+
     {handTotal !== null && (
-      <div style={{ 
-        marginLeft: "1rem",
-        fontWeight: "bold",
-        fontSize: "1.2rem",
-        color: getTotalColor(handTotal)
-      }}>
+      <div
+        style={{
+          fontWeight: "bold",
+          fontSize: "1.2rem",
+          color: getTotalColor(handTotal),
+        }}
+      >
         Total: {handTotal}
       </div>
     )}
   </div>
 </div>
+
 {/* Game Outcome Display */}
 {gameState === 3 && gameOutcome.result && (
               <div style={{ 
@@ -1108,7 +1148,7 @@ const Game = () => {
               padding: "0.75rem 2rem", 
               fontSize: "1.2rem", 
               fontWeight: "bold",
-              backgroundColor: "#2196f3",
+              backgroundColor: "#f97316",
               color: "white",
               borderRadius: "8px",
               border: "none",
