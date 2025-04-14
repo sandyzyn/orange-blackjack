@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-
 import SignIn from "./components/SignIn";
 import Game from "./components/Game";
 import InfoPage from "./components/InfoPage";
-import Leaderboard from "./components/Leaderboard"; // 👈 Add this
+import Leaderboard from "./components/Leaderboard"; 
 import Navbar from "./components/Navbar";
 
 function App() {
