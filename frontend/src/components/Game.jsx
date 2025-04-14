@@ -110,6 +110,8 @@ const Game = () => {
   });
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [gameOutcome, setGameOutcome] = useState({ status: "", result: "", payout: 0 });
+  const [showStats, setShowStats] = useState(false);
+
 
   const showToast = (message, color) => {
     setToast({ message, color });
@@ -705,22 +707,77 @@ const Game = () => {
         <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
         <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
+        <p><button 
+          onClick={() => setShowStats(true)} 
+          style={{ 
+            marginTop: "0rem", 
+            padding: "0.5rem 1rem", 
+            backgroundColor: "#f97316", 
+            color: "white", 
+            border: "none", 
+            borderRadius: "8x", 
+            cursor: "pointer", 
+            fontFamily: "Georgia, Serif"
+          }}
+        >
+          View Your Stats
+        </button></p>
+        
+
         {/* Stats Panel */}
-        <div style={{ marginBottom: "2rem", backgroundColor: "#fff3e0", padding: "1rem", borderRadius: "8px", fontFamily: "Georgia, serif", width: "100%", maxWidth: "600px" }}>
-          <h3 style={{ textAlign: "center", marginBottom: "1rem", color: "#f97316" }}>Your Stats</h3>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-            <div><strong>Name:</strong> {playerStats.name}</div>
-            <div><strong>Wins:</strong> {playerStats.wins}</div>
-            <div><strong>Losses:</strong> {playerStats.losses}</div>
-            <div><strong>Ties:</strong> {playerStats.ties}</div>
-            <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
-            <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
-            <div><strong>Total Bets:</strong> {formatLargeNumber(Number(playerStats.totalBets))} LUSD</div>
-            <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
-              <strong>Net Profit:</strong> {formatLargeNumber(Number(netProfit))} LUSD
+        {showStats && (
+          <div style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999
+          }}>
+            <div style={{
+              backgroundColor: "white",
+              borderRadius: "12px",
+              padding: "2rem",
+              width: "90%",
+              maxWidth: "500px",
+              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+              fontFamily: "Georgia, serif"
+            }}>
+              <h2 style={{ textAlign: "center", marginBottom: "1rem", color: "#f97316" }}>Your Stats</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div><strong>Name:</strong> {playerStats.name}</div>
+                <div><strong>Wins:</strong> {playerStats.wins}</div>
+                <div><strong>Losses:</strong> {playerStats.losses}</div>
+                <div><strong>Ties:</strong> {playerStats.ties}</div>
+                <div><strong>Blackjacks:</strong> {playerStats.blackjacks}</div>
+                <div><strong>Games Played:</strong> {playerStats.gamesPlayed}</div>
+                <div><strong>Total Bets:</strong> {formatLargeNumber(Number(playerStats.totalBets))} LUSD</div>
+                <div style={{ color: netProfit >= 0 ? "green" : "red" }}>
+                  <strong>Net Profit:</strong> {formatLargeNumber(Number(netProfit))} LUSD
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowStats(false)} 
+                style={{ 
+                  marginTop: "1.5rem", 
+                  backgroundColor: "#f97316", 
+                  color: "white", 
+                  padding: "0.5rem 1rem", 
+                  border: "none", 
+                  borderRadius: "8px", 
+                  cursor: "pointer",
+                  display: "block",
+                  fontFamily: "Georgia, Serif",
+                  marginLeft: "auto",
+                  marginRight: "auto"
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
-        </div>
+        )}
         {isOwner && (
   <div style={{ marginBottom: "2rem", backgroundColor: "#ffe4c4", padding: "1rem", borderRadius: "8px" }}>
     <h3>🔧 Admin Controls</h3>
@@ -968,17 +1025,45 @@ const Game = () => {
     </p>
   )}
 
-  <div style={{ marginBottom: "1rem" }}>
+  <div style={{ marginBottom: "1rem", display: "flex", justifyContent: "center", alignItems: "center" }}>
     <input
       type="number"
       placeholder="Enter bet in LUSD"
       value={betAmount}
       onChange={(e) => setBetAmount(e.target.value)}
-      style={{ padding: "0.5rem", fontSize: "1rem", width: "200px", marginRight: "1rem" }}
+      style={{
+        padding: "0.5rem",
+        fontSize: "1rem",
+        fontFamily: "Georgia, serif",
+        width: "200px",
+        marginRight: "1rem"
+      }}
     />
-    <button onClick={placeBet} disabled={!isApproved || gameState === 1 || gameState === 2}>Place Bet</button>
+    <button
+      onClick={placeBet}
+      disabled={!isApproved || gameState === 1 || gameState === 2}
+      style={{
+        fontFamily: "Georgia, serif",
+        fontSize: "1rem",
+        padding: "0.5rem 1rem",
+        cursor: "pointer"
+      }}
+    >
+      Place Bet
+    </button>
     {!isApproved && (
-      <button onClick={approveLUSD} style={{ marginLeft: "1rem" }}>Approve LUSD</button>
+      <button
+        onClick={approveLUSD}
+        style={{
+          marginLeft: "1rem",
+          fontFamily: "Georgia, serif",
+          fontSize: "1rem",
+          padding: "0.5rem 1rem",
+          cursor: "pointer"
+        }}
+      >
+        Approve LUSD
+      </button>
     )}
   </div>
 </div>
@@ -1153,7 +1238,8 @@ const Game = () => {
               borderRadius: "8px",
               border: "none",
               cursor: "pointer",
-              marginTop: "1rem"
+              marginTop: "1rem",
+              fontFamily: "Georgia, Serif"
             }}
           >
             Start New Game
