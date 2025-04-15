@@ -2,6 +2,16 @@ import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import { STATS_CONTRACT_ADDRESS, STATS_CONTRACT_ABI } from "../contract/OrangeBlackJack";
 
+const formatLargeNumber = (num) => {
+  if (num >= 1e9) {
+    return (num / 1e9).toFixed(2) + " billion";
+  } else if (num >= 1e6) {
+    return (num / 1e6).toFixed(2) + " million";
+  } else {
+    return Number(num).toFixed(2);
+  }
+};
+
 const Leaderboard = () => {
   const [leaderboardEntries, setLeaderboardEntries] = useState([]);
 
@@ -66,7 +76,7 @@ const Leaderboard = () => {
                     {entry.name || `${entry.address.substring(0, 6)}...${entry.address.substring(38)}`}
                   </td>
                   <td style={{ padding: "10px", borderBottom: "1px solid #f0f0f0", textAlign: "center", color: entry.netProfit >= 0 ? "green" : "red" }}>
-                    {entry.netProfit.toFixed(2)} LUSD
+                    {formatLargeNumber(entry.netProfit)} LUSD
                   </td>
                 </tr>
               ))}
