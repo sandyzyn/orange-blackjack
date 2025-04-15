@@ -807,7 +807,6 @@ const Game = () => {
           </div>
         )}
 
-        <StatusBar status={status} />
         <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
         <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
@@ -1171,6 +1170,7 @@ const Game = () => {
     )}
   </div>
 </div>
+<StatusBar status={status} />
 
 {/* Game Area */}
 {(hasGame || gameState === 3) && (
