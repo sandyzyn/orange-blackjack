@@ -72,6 +72,81 @@ const Toast = ({ message, color }) => (
   </div>
 );
 
+const StatusBar = ({ status }) => {
+  const [progress, setProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    // Check if status contains loading-related keywords
+    const loadingTerms = [
+      "Placing bet...",
+      "Hitting...", 
+      "Standing...",
+      "Connecting...",
+      "Approving...",
+      "Waiting for confirmation"
+    ];
+    
+    const isLoadingStatus = loadingTerms.some(term => status.includes(term));
+    
+    if (isLoadingStatus) {
+      setIsLoading(true);
+      setProgress(0);
+      
+      // Create animation over 8 seconds
+      const interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(interval);
+            return 100;
+          }
+          return prev + 0.6;
+        });
+      }, 100); // Update every 100ms for smoother animation
+      
+      return () => clearInterval(interval);
+    } else {
+      setIsLoading(false);
+      setProgress(0);
+    }
+  }, [status]);
+  
+  // Create boxes for the loading bar
+  const totalBoxes = 20;
+  const filledBoxes = Math.floor(progress / 100 * totalBoxes);
+  
+  return (
+    <div style={{ marginBottom: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <strong>Status:</strong> 
+        <span>{status}</span>
+      </div>
+      
+      {isLoading && (
+        <div style={{ 
+          marginTop: "0.5rem",
+          display: "flex", 
+          gap: "4px",
+          width: "100%"
+        }}>
+          {Array.from({ length: totalBoxes }).map((_, index) => (
+            <div
+              key={index}
+              style={{
+                height: "8px",
+                flex: 1,
+                backgroundColor: index < filledBoxes ? "#4caf50" : "#e0e0e0",
+                borderRadius: "2px",
+                transition: "background-color 0.2s ease"
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Game = () => {
   const [status, setStatus] = useState("🦊 Connect your wallet to begin.");
   const [betAmount, setBetAmount] = useState("");
@@ -355,6 +430,7 @@ const Game = () => {
     if (!gameContract) return;
     try {
       const tx = await gameContract.forceEndGame(walletAddress);
+      setStatus("🔄 Resetting game... Waiting for confirmation");  // Modified line
       await tx.wait();
       setStatus("🔁 Game reset successfully.");
       await fetchGameState();
@@ -370,6 +446,7 @@ const Game = () => {
   const approveLUSD = async () => {
     try {
       const tx = await LUSD.approve(GAME_CONTRACT_ADDRESS, ethers.parseUnits("100000000", 18));
+      setStatus("⏳ Approving LUSD... Waiting for confirmation");  // Modified line
       await tx.wait();
       setStatus("✅ Approved LUSD for betting.");
       setIsApproved(true);
@@ -384,17 +461,17 @@ const Game = () => {
       setStatus("❌ Please approve LUSD before betting.");
       return;
     }
-  
+
     try {
       const gameData = await gameContract.getGameState(walletAddress);
       if (Number(gameData.state) === 1 || Number(gameData.state) === 2) {
         setStatus("⚠️ You already have a game in progress.");
         return;
       }
-  
+
       const amount = ethers.parseUnits(betAmount, 18);
       const tx = await gameContract.placeBet(amount);
-      setStatus("🎮 Placing bet...");
+      setStatus("🎮 Placing bet... Waiting for confirmation"); 
       await tx.wait();
       
       // Refresh all game data
@@ -418,7 +495,13 @@ const Game = () => {
       }
     } catch (err) {
       console.error(err);
-      setStatus("❌ Bet failed: " + (err.reason || err.message || "Please enter a valid number"));
+      
+      if (err.receipt && err.receipt.status === 0) {
+        setStatus("❌ Gas fees currently too high; please try again");
+        showToast("Gas fees currently too high; please try again", "red");
+      } else {
+        setStatus("❌ Bet failed: " + (err.reason || err.message || "Unknown error"));
+      }
     }
   };
 
@@ -436,10 +519,10 @@ const Game = () => {
       }
   
       const tx = await gameContract.hit();
-      setStatus("🎯 Hitting...");
+      setStatus("🎯 Hitting... Waiting for confirmation");
       await tx.wait();
   
-      // Refresh game data
+      // Refresh game data after successful hit
       await fetchHands();
       await fetchGameState();
       await checkIfPlayerHasGame(gameContract);
@@ -451,12 +534,12 @@ const Game = () => {
           setStatus("💥 You busted! Game over.");
           showToast("💥 You busted!", "red");
           setShowOutcomeAnimation("loss");
-          setTimeout(() => setShowOutcomeAnimation(""), 6000);
+          setTimeout(() => setShowOutcomeAnimation(""), 11000);
         } else if (updatedGameData.result === "Win") {
           setStatus(`🎮 You won!`);
           showToast(`🎮 You won!`, "green");
           setShowOutcomeAnimation("win");
-          setTimeout(() => setShowOutcomeAnimation(""), 6000);
+          setTimeout(() => setShowOutcomeAnimation(""), 11000);
         } else {
           setStatus(`🎮 Game over: ${updatedGameData.result}`);
           showToast(`🎮 ${updatedGameData.result}`, updatedGameData.payout > 0 ? "green" : "red");
@@ -469,7 +552,13 @@ const Game = () => {
       }
     } catch (err) {
       console.error(err);
-      setStatus("❌ Hit failed: " + (err.reason || err.message));
+      
+      if (err.receipt && err.receipt.status === 0) {
+        setStatus("❌ Gas fees currently too high; please try again");
+        showToast("Gas fees currently too high; please try again", "red");
+      } else {
+        setStatus("❌ Hit failed: " + (err.reason || err.message || "Unknown error"));
+      }
     }
   };
 
@@ -487,7 +576,7 @@ const Game = () => {
       }
   
       const tx = await gameContract.stand();
-      setStatus("🛑 Standing...");
+      setStatus("🛑 Standing... Waiting for confirmation");
       await tx.wait();
   
       // Refresh game data
@@ -522,8 +611,14 @@ const Game = () => {
       await fetchLeaderboard();
       await checkLusdAllowanceAndBalance(LUSD, walletAddress);
     } catch (err) {
-      console.error("❌ Stand failed: ", err);
-      setStatus("❌ Stand failed — possibly not your game or already ended.");
+      console.error(err);
+      
+      if (err.receipt && err.receipt.status === 0) {
+        setStatus("❌ Gas fees currently too high; please try again");
+        showToast("Gas fees currently too high; please try again", "red");
+      } else {
+        setStatus("❌ Stand failed: " + (err.reason || err.message || "Unknown error"));
+      }
     }
   };
 
@@ -541,11 +636,14 @@ const Game = () => {
 
       // Note: The edit function has been combined in the contract
       const tx = await gameContract.editHand(editPlayerAddress, true, cards);
+      setStatus("✏️ Editing player hand... Waiting for confirmation");  // Add this line
       await tx.wait();
+      setStatus("✅ Player hand edited successfully");  // Add this line
       showToast("✅ Player hand edited", "green");
       setEditPlayerInput("");
     } catch (err) {
       console.error(err);
+      setStatus("❌ Failed to edit player hand");  // Add this line
       showToast("❌ Failed to edit player hand", "red");
     }
   };
@@ -561,26 +659,32 @@ const Game = () => {
         return;
       }
 
-      // Note: The edit function has been combined in the contract
       const tx = await gameContract.editHand(editPlayerAddress, false, cards);
+      setStatus("✏️ Editing dealer hand... Waiting for confirmation");  // Add this line
       await tx.wait();
+      setStatus("✅ Dealer hand edited successfully");  // Add this line
       showToast("✅ Dealer hand edited", "green");
       setEditDealerInput("");
     } catch (err) {
       console.error(err);
+      setStatus("❌ Failed to edit dealer hand");  // Add this line
       showToast("❌ Failed to edit dealer hand", "red");
     }
   };
+
   const withdrawFunds = async () => {
     if (!gameContract || !isOwner) return;
     try {
       const amount = ethers.parseUnits(withdrawAmount, 18);
       const tx = await gameContract.withdraw(amount);
+      setStatus("💰 Withdrawing funds... Waiting for confirmation");  // Add this line
       await tx.wait();
+      setStatus("✅ Funds withdrawn successfully");  // Add this line
       showToast(`✅ Withdrew ${formatLargeNumber(Number(withdrawAmount))} LUSD`, "green");
       setWithdrawAmount("");
     } catch (err) {
       console.error(err);
+      setStatus("❌ Failed to withdraw funds");  // Add this line
       showToast("❌ Failed to withdraw funds", "red");
     }
   };
@@ -703,7 +807,7 @@ const Game = () => {
           </div>
         )}
 
-        <p><strong>Status:</strong> {status}</p>
+        <StatusBar status={status} />
         <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
         <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
