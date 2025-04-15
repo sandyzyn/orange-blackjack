@@ -1268,29 +1268,6 @@ const Game = () => {
   </div>
 </div>
 
-{/* Game Outcome Display */}
-{gameState === 3 && gameOutcome.result && (
-              <div style={{ 
-                marginTop: "1rem", 
-                padding: "1rem", 
-                backgroundColor: 
-                  gameOutcome.result === "Win" || gameOutcome.result === "Blackjack" ? "#e6ffe6" : 
-                  gameOutcome.result === "Loss" || gameOutcome.result === "Bust" ? "#ffe6e6" : 
-                  "#f0f0f0",
-                borderRadius: "8px",
-                textAlign: "center",
-                fontWeight: "bold",
-                fontSize: "1.2rem"
-              }}>
-                <div>Result: {gameOutcome.result}</div>
-                {gameOutcome.payout > 0 && (
-                  <div style={{ color: "green", marginTop: "0.5rem" }}>
-                    Payout: {formatLargeNumber(Number(gameOutcome.payout))} LUSD
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Game Controls */}
             {gameState === 1 && (
               <div style={{ display: "flex", justifyContent: "center", gap: "1rem" }}>
@@ -1355,7 +1332,7 @@ const Game = () => {
         <p>Game Contract: {GAME_CONTRACT_ADDRESS}</p>
         <p>Stats Contract: {STATS_CONTRACT_ADDRESS}</p>
         <p>Your Address: {walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}` : "Not connected"}</p>
-        <p>Brought to you by: Arjun Shetty, Brain Zhou, Kaden Kram, Karen Wu, Sandy Zhang</p>
+        <p>Brought to you by: Arjun Shetty, Brian Zhou, Kaden Kram, Karen Wu, Sandy Zhang</p>
       </div>
     </div>
   );
