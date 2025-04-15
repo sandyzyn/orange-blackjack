@@ -808,7 +808,6 @@ const Game = () => {
         )}
 
         <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
-        <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
         <p><button 
           onClick={() => setShowStats(true)} 
