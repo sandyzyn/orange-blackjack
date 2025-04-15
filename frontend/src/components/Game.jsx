@@ -808,7 +808,6 @@ const Game = () => {
         )}
 
         <p><strong>LUSD Balance:</strong> {formatLargeNumber(Number(lusdBalance))} LUSD</p>
-        <p><strong>Game State:</strong> {GAME_STATES[gameState]}</p>
 
         <p><button 
           onClick={() => setShowStats(true)} 
@@ -1356,7 +1355,7 @@ const Game = () => {
         <p>Game Contract: {GAME_CONTRACT_ADDRESS}</p>
         <p>Stats Contract: {STATS_CONTRACT_ADDRESS}</p>
         <p>Your Address: {walletAddress ? `${walletAddress.substring(0, 6)}...${walletAddress.substring(38)}` : "Not connected"}</p>
-        <p>Brought to you by: Arjun Shetty, Brain Zhou, Kaden Kram, Karen Wu, Sandy Zhang</p>
+        <p>Brought to you by: Arjun Shetty, Brian Zhou, Kaden Kram, Karen Wu, Sandy Zhang</p>
       </div>
     </div>
   );
