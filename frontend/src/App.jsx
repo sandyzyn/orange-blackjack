@@ -4,6 +4,7 @@ import SignIn from "./components/SignIn";
 import Game from "./components/Game";
 import InfoPage from "./components/InfoPage";
 import Leaderboard from "./components/Leaderboard"; 
+import Achievements from "./components/Achievements";
 import Navbar from "./components/Navbar";
 
 function App() {
@@ -33,8 +34,10 @@ function App() {
       <Routes>
         <Route path="/signin" element={<SignIn setAddress={setAddress} />} />
         <Route path="/" element={<Game address={address} />} />
+        <Route path="/game" element={<Game address={address} />} />
         <Route path="/about" element={<InfoPage />} />
         <Route path="/leaderboard" element={<Leaderboard />} /> 
+        <Route path="/achievements" element={<Achievements address={address} />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </>

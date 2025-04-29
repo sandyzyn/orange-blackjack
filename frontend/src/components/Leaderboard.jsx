@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { STATS_CONTRACT_ADDRESS, STATS_CONTRACT_ABI } from "../contract/OrangeBlackJack";
+import { STATS_CONTRACT_ADDRESS, STATS_CONTRACT_ABI } from "../contracts/OrangeBlackJack";
 
 const formatLargeNumber = (num) => {
   if (num >= 1e9) {

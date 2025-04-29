@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import { GAME_CONTRACT_ADDRESS, STATS_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, STATS_CONTRACT_ABI } from "../contract/OrangeBlackJack";
+import { GAME_CONTRACT_ADDRESS, STATS_CONTRACT_ADDRESS, GAME_CONTRACT_ABI, STATS_CONTRACT_ABI } from "../contracts/OrangeBlackJack";
 
 
 const CardAnimationStyles = () => (
