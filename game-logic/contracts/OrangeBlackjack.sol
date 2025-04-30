@@ -230,6 +230,7 @@ contract BlackjackStats {
         return int256(s.earnings) - int256(s.bets);
     }
 }
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
@@ -272,7 +273,7 @@ contract OrangeBlackjack {
     uint8 constant DEALER_STAND = 17;
 
     event GameStarted(address indexed player, uint256 bet);
-    event CardDealt(address indexed player, uint8 card);
+    event CardDealt(address indexed player, uint8 card, bool isPlayer);
     event GameEnded(address indexed player, string result, uint256 payout);
     event HandEdited(address indexed player, bool isPlayer, uint8[] newHand);
     event GameForceEnded(address indexed player);
@@ -317,30 +318,62 @@ contract OrangeBlackjack {
 
         game.bet = amount;
         game.state = GState.PlayerTurn;
-        game.playerHand.push(_randomCard("p1"));
-        game.playerHand.push(_randomCard("p2"));
-        game.dealerHand.push(_randomCard("d1"));
-        game.dealerHand.push(_randomCard("d2"));
-
+        
+        // Deal two cards to player
+        uint8 playerCard1 = _randomCard("p1");
+        uint8 playerCard2 = _randomCard("p2");
+        game.playerHand.push(playerCard1);
+        game.playerHand.push(playerCard2);
+        
+        // Deal one visible card to dealer
+        uint8 dealerCard = _randomCard("d1");
+        game.dealerHand.push(dealerCard);
+        
+        emit CardDealt(msg.sender, playerCard1, true);
+        emit CardDealt(msg.sender, playerCard2, true);
+        emit CardDealt(msg.sender, dealerCard, false);
         emit GameStarted(msg.sender, amount);
 
+        // Check for player blackjack - in this case we need to deal the dealer's second card immediately
         if (_isBlackjack(game.playerHand)) {
-            _handleBlackjack(game);
+            _handlePlayerBlackjack(game);
         }
     }
 
-    function _handleBlackjack(Game storage game) private {
-        uint256 payout = (game.bet * 5) / 2;
-        LUSD.transfer(msg.sender, payout);
-        game.state = GState.Finished;
-        game.result = "Blackjack";
-        game.payout = payout;
+    function _handlePlayerBlackjack(Game storage game) private {
+        // Deal the dealer's second card
+        uint8 dealerCard2 = _randomCard("d2_blackjack");
+        game.dealerHand.push(dealerCard2);
+        emit CardDealt(msg.sender, dealerCard2, false);
         
-        if (statsContract != address(0)) {
-            IBlackjackStats(statsContract).recordBlackjack(msg.sender, payout);
+        // Check if dealer also has blackjack
+        if (_isBlackjack(game.dealerHand)) {
+            // It's a push (tie) if dealer also has blackjack
+            uint256 payout = game.bet;
+            LUSD.transfer(msg.sender, payout);
+            game.state = GState.Finished;
+            game.result = "Push - Both Blackjack";
+            game.payout = payout;
+            
+            if (statsContract != address(0)) {
+                IBlackjackStats(statsContract).recordTie(msg.sender, payout);
+            }
+            
+            emit GameEnded(msg.sender, "Push - Both Blackjack", payout);
+        } else {
+            // Player blackjack pays 3:2
+            uint256 payout = (game.bet * 5) / 2;
+            LUSD.transfer(msg.sender, payout);
+            game.state = GState.Finished;
+            game.result = "Blackjack";
+            game.payout = payout;
+            
+            if (statsContract != address(0)) {
+                IBlackjackStats(statsContract).recordBlackjack(msg.sender, payout);
+            }
+            
+            emit GameEnded(msg.sender, "Blackjack!", payout);
         }
-        
-        emit GameEnded(msg.sender, "Blackjack!", payout);
     }
 
     function hit() external onlyPlayer {
@@ -349,7 +382,7 @@ contract OrangeBlackjack {
 
         uint8 card = _randomCard("hit");
         game.playerHand.push(card);
-        emit CardDealt(msg.sender, card);
+        emit CardDealt(msg.sender, card, true);
 
         if (_handValue(game.playerHand) > BLACKJACK) {
             game.state = GState.Finished;
@@ -371,9 +404,17 @@ contract OrangeBlackjack {
         require(game.state == GState.PlayerTurn, "Not your turn");
 
         game.state = GState.DealerTurn;
+        
+        // First, deal the dealer's second card now that player has completed their turn
+        uint8 dealerCard2 = _randomCard("d2");
+        game.dealerHand.push(dealerCard2);
+        emit CardDealt(msg.sender, dealerCard2, false);
 
+        // Dealer draws cards until reaching 17 or higher
         while (_handValue(game.dealerHand) < DEALER_STAND) {
-            game.dealerHand.push(_randomCard("deal"));
+            uint8 card = _randomCard("dealer_hit");
+            game.dealerHand.push(card);
+            emit CardDealt(msg.sender, card, false);
         }
 
         uint256 playerScore = _handValue(game.playerHand);

@@ -66,26 +66,11 @@ function Navbar({ setAddress }) {
               fontFamily: "Georgia, Serif",
               color: "#000000",
               textDecoration: "none",
-              marginRight: "20px",
             }}
             onMouseOver={(e) => (e.target.style.color = "#f97316")}
             onMouseOut={(e) => (e.target.style.color = "#000000")}
           >
             Leaderboard
-          </Link>
-          <Link
-            to="/achievements"
-            style={{
-              fontSize: "14px",
-              fontWeight: "500",
-              fontFamily: "Georgia, Serif",
-              color: "#000000",
-              textDecoration: "none",
-            }}
-            onMouseOver={(e) => (e.target.style.color = "#f97316")}
-            onMouseOut={(e) => (e.target.style.color = "#000000")}
-          >
-            Achievements
           </Link>
         </div>
         <div style={{ display: "flex", gap: "12px" }}>
